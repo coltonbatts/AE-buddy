@@ -4,6 +4,7 @@ import { commitPreparedRun, loadRunHistory, prepareRun, readExecutionFeedback } 
 import type { EngineHost, PreparedRun } from "@/engine/contracts.js";
 import type { AEContext, LoggedRun, MotionBuddyRuntimeConfig } from "@/shared/types.js";
 import { createDesktopEngineHost } from "./desktop-host.js";
+import { triggerCepExecution } from "./desktop-api.js";
 
 export interface UiEvent {
   id: string;
@@ -197,8 +198,31 @@ export function useMotionBuddy() {
     addEvent(
       "info",
       "Execution bundle written",
-      `Run ${run.generatedPlan.actionPlan.summary}. Open the AE import bridge to execute the generated JSX.`,
+      `Run ${run.generatedPlan.actionPlan.summary}. Motion Buddy is pinging the CEP bridge for auto-apply.`,
     );
+
+    try {
+      const cepResult = await triggerCepExecution({
+        runId: run.runId,
+        importScriptPath: engineHost.config.importScriptPath,
+        commandUrl: engineHost.config.cepCommandUrl,
+      });
+
+      addEvent(
+        cepResult.ok ? "success" : "warning",
+        "CEP auto-execution dispatched",
+        cepResult.message || `After Effects accepted run ${run.runId} for execution.`,
+      );
+    } catch (error) {
+      addEvent(
+        "warning",
+        "CEP bridge unavailable",
+        [
+          error instanceof Error ? error.message : String(error),
+          `Manual fallback: run ${engineHost.config.importScriptPath} inside After Effects.`,
+        ].join(" "),
+      );
+    }
 
     stopPolling();
     pollingRef.current = window.setInterval(() => {

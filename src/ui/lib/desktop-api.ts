@@ -18,6 +18,19 @@ export async function generateOpenAiPlan(params: {
   return invoke<unknown>("generate_openai_plan", params);
 }
 
+export async function triggerCepExecution(params: {
+  runId: string;
+  importScriptPath: string;
+  commandUrl?: string;
+}) {
+  return invoke<{
+    ok: boolean;
+    message: string;
+    runId?: string | null;
+    endpoint?: string | null;
+  }>("trigger_cep_execution", params);
+}
+
 export async function openDesktopPath(path: string) {
   await openPath(path);
 }

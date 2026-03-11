@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Motion Buddy</title>
+    <title>Motion Buddy Bridge</title>
     <link rel="stylesheet" href="./css/style.css" />
   </head>
   <body>
@@ -12,52 +12,44 @@
       <section class="panel-card" aria-labelledby="panel-title">
         <header class="panel-header">
           <p class="eyebrow">After Effects CEP</p>
-          <h1 id="panel-title">Motion Buddy</h1>
+          <div class="header-row">
+            <h1 id="panel-title">Motion Buddy Bridge</h1>
+            <div id="statusPill" class="status-pill" data-state="working" aria-live="polite">
+              <span class="status-dot" aria-hidden="true"></span>
+              <span id="statusText">Booting</span>
+            </div>
+          </div>
           <p class="panel-copy">
-            Prompt, generate, and apply in one panel.
+            Keep this panel open in After Effects. Motion Buddy Studio will POST auto-execution commands here after
+            it writes the `receipt.json` and `generated-script.jsx` bundle.
           </p>
         </header>
 
-        <form id="motionBuddyForm" class="panel-form">
-          <label class="field-label" for="promptInput">Prompt</label>
-          <textarea
-            id="promptInput"
-            name="prompt"
-            class="prompt-input"
-            rows="8"
-            placeholder="Offset selected layers by 5 frames"
-            spellcheck="false"></textarea>
-
-          <div class="panel-actions">
-            <button id="generateButton" type="submit" class="generate-button">
-              Generate &amp; Apply
-            </button>
-
-            <div id="statusPill" class="status-pill" data-state="idle" aria-live="polite">
-              <span class="status-dot" aria-hidden="true"></span>
-              <span id="statusText">Idle</span>
-            </div>
+        <dl class="meta-list">
+          <div class="meta-item">
+            <dt>Endpoint</dt>
+            <dd id="endpointValue">http://127.0.0.1:9123/motion-buddy/execute</dd>
           </div>
-        </form>
+          <div class="meta-item">
+            <dt>Last Run</dt>
+            <dd id="lastRunValue">None</dd>
+          </div>
+        </dl>
+
+        <div class="panel-actions">
+          <button id="restartServerButton" type="button" class="primary-button">Restart bridge</button>
+          <button id="clearLogButton" type="button" class="ghost-button">Clear log</button>
+        </div>
 
         <section class="console-wrap" aria-labelledby="console-title">
           <div class="console-heading">
-            <h2 id="console-title">Panel Log</h2>
-            <button id="clearLogButton" type="button" class="ghost-button">
-              Clear
-            </button>
+            <h2 id="console-title">Bridge Log</h2>
           </div>
-          <pre id="logConsole" class="log-console" aria-live="polite">Ready.</pre>
+          <pre id="logConsole" class="log-console" aria-live="polite">Bridge booting...</pre>
         </section>
       </section>
     </main>
 
-    <!--
-      Copy the official Adobe CSInterface.js file into:
-      ./js/vendor/CSInterface.js
-
-      The panel still renders without it, but none of the host calls will work.
-    -->
     <script src="./js/vendor/CSInterface.js"></script>
     <script src="./js/main.js"></script>
   </body>

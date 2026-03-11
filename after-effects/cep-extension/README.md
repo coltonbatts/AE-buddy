@@ -1,41 +1,54 @@
-# Motion Buddy CEP Panel Scaffold
+# Motion Buddy CEP Auto-Execution Bridge
 
-This folder contains a minimal Adobe CEP panel scaffold for After Effects CC 2022+.
+This CEP extension is a tiny After Effects panel that keeps a local HTTP bridge open for Motion Buddy Studio.
+
+## What it does
+
+1. The Tauri app writes `generated-script.jsx` and `receipt.json` into the existing repo-local `.motion-buddy/out` folder.
+2. The Tauri app POSTs to `http://127.0.0.1:9123/motion-buddy/execute`.
+3. The CEP panel receives the command and asks After Effects to evaluate `after-effects/import-generated-script.jsx`.
+4. `import-generated-script.jsx` validates the `runId`, wraps the execution in `app.beginUndoGroup("Motion Buddy Action")`, runs the generated JSX, and writes `execution-result.json`.
+
+The CEP panel stays dumb: no API keys, no model calls, and no direct script generation.
+
+## Trigger payload
+
+The Tauri host sends:
+
+```json
+{
+  "runId": "2026-03-11T18-04-05-123Z-uuid",
+  "importScriptPath": "/absolute/path/to/after-effects/import-generated-script.jsx",
+  "suppressAlerts": true
+}
+```
 
 ## Files
 
-- `CSXS/manifest.xml`: CEP manifest and panel registration
-- `index.html`: Panel markup
-- `css/style.css`: Dark AE-style UI
-- `js/main.js`: Panel orchestration and backend stub
-- `jsx/hostscript.jsx`: ExtendScript host functions called from the panel
+- `CSXS/manifest.xml`: CEP registration and panel sizing
+- `index.html`: Tiny bridge UI for status and logs
+- `css/style.css`: Small dockable panel styling
+- `js/main.js`: Local HTTP listener and AE dispatch logic
+- `jsx/hostscript.jsx`: ExtendScript functions invoked from the panel
 
-## Before Loading The Panel
+## Local install
 
-1. Copy the official Adobe `CSInterface.js` file into:
+1. Copy Adobe's official `CSInterface.js` into `after-effects/cep-extension/js/vendor/CSInterface.js`.
+2. Symlink or copy this folder to your CEP extensions directory.
 
-   `after-effects/cep-extension/js/vendor/CSInterface.js`
+macOS:
+`~/Library/Application Support/Adobe/CEP/extensions/MotionBuddyBridge`
 
-2. Install or symlink this `cep-extension` folder into your CEP extensions directory.
+Windows:
+`%APPDATA%/Adobe/CEP/extensions/MotionBuddyBridge`
 
-   macOS:
-   `~/Library/Application Support/Adobe/CEP/extensions/MotionBuddy`
+3. Enable CEP debug mode locally if needed.
+4. Open After Effects, then open the `Motion Buddy Bridge` panel from `Window > Extensions`.
+5. Keep the panel open while using Motion Buddy Studio.
 
-   Windows:
-   `%APPDATA%/Adobe/CEP/extensions/MotionBuddy`
+## Runtime notes
 
-3. If you are debugging unsigned extensions locally, enable PlayerDebugMode for CEP on your machine.
-
-## Where To Plug In Your Existing Logic
-
-- Replace `exportContext()` inside `jsx/hostscript.jsx` with your current exporter.
-- Replace `callMotionBuddyBackend()` inside `js/main.js` with your local server or CLI call.
-- Extend `applyGeneratedScript()` inside `jsx/hostscript.jsx` if you want your current execution result handling.
-
-## Default Exchange Location
-
-The scaffold writes to:
-
-`Folder.userData/Motion Buddy/.motion-buddy`
-
-That avoids depending on the extension install path. If you want to keep using your repository-local `.motion-buddy` folder instead, update `mbGetExchangeFolder()` in `jsx/hostscript.jsx`.
+- Default bridge endpoint: `http://127.0.0.1:9123/motion-buddy/execute`
+- Override from the Tauri side with `MOTION_BUDDY_CEP_URL`
+- Health check endpoint: `http://127.0.0.1:9123/motion-buddy/health`
+- If the panel is closed or the port is unreachable, Motion Buddy Studio falls back to the existing manual import step

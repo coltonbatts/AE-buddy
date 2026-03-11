@@ -243,6 +243,7 @@ export interface MotionBuddyRuntimeConfig {
   executionResultPath: string;
   exportContextScriptPath: string;
   importScriptPath: string;
+  cepCommandUrl: string;
   model: string;
   openAiEnabled: boolean;
 }

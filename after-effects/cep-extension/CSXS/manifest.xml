@@ -3,7 +3,7 @@
   Version="7.0"
   ExtensionBundleId="com.motionbuddy.cep"
   ExtensionBundleVersion="0.1.0"
-  ExtensionBundleName="Motion Buddy"
+  ExtensionBundleName="Motion Buddy Bridge"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
     <Extension Id="com.motionbuddy.panel" Version="0.1.0" />
@@ -38,19 +38,19 @@
         </Lifecycle>
         <UI>
           <Type>Panel</Type>
-          <Menu>Motion Buddy</Menu>
+          <Menu>Motion Buddy Bridge</Menu>
           <Geometry>
             <Size>
-              <Width>420</Width>
-              <Height>620</Height>
+              <Width>360</Width>
+              <Height>320</Height>
             </Size>
             <MinSize>
-              <Width>360</Width>
-              <Height>520</Height>
+              <Width>300</Width>
+              <Height>240</Height>
             </MinSize>
             <MaxSize>
-              <Width>1600</Width>
-              <Height>1600</Height>
+              <Width>900</Width>
+              <Height>1200</Height>
             </MaxSize>
           </Geometry>
         </UI>

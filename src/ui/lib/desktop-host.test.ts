@@ -31,6 +31,7 @@ function createRuntimeConfig(rootDir: string, openAiEnabled: boolean): MotionBud
     executionResultPath: path.join(outDir, "execution-result.json"),
     exportContextScriptPath: path.join(rootDir, "after-effects", "export-context.jsx"),
     importScriptPath: path.join(rootDir, "after-effects", "import-generated-script.jsx"),
+    cepCommandUrl: "http://127.0.0.1:9123/motion-buddy/execute",
     model: "gpt-4.1-mini",
     openAiEnabled,
   };

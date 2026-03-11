@@ -316,7 +316,6 @@ export function renderActionPlan(plan: ActionPlan, context: AEContext) {
     "    actionsExecuted: [],",
     "    affectedTargets: []",
     "  };",
-    "  var undoStarted = false;",
     "  var comp = null;",
     "  var selectedLayers = null;",
     "  var mbCamera = null;",
@@ -389,8 +388,6 @@ export function renderActionPlan(plan: ActionPlan, context: AEContext) {
     "  }",
     "",
     "  try {",
-    '    app.beginUndoGroup("Motion Buddy");',
-    "    undoStarted = true;",
     actionBlocks
       ? actionBlocks
           .split("\n")
@@ -401,11 +398,6 @@ export function renderActionPlan(plan: ActionPlan, context: AEContext) {
     '    mbResult.status = "error";',
     "    mbResult.message = error && error.toString ? error.toString() : String(error);",
     "  } finally {",
-    "    if (undoStarted) {",
-    "      try {",
-    "        app.endUndoGroup();",
-    "      } catch (_undoError) {}",
-    "    }",
     "    $.global.__motionBuddyResult = mbResult;",
     "  }",
     "",

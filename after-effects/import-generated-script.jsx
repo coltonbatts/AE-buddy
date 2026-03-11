@@ -94,6 +94,14 @@ function mbEnsureFolder(folder) {
   }
 }
 
+function mbAlertUnlessSuppressed(message) {
+  if ($.global.__motionBuddySuppressAlerts === true) {
+    return;
+  }
+
+  alert(message);
+}
+
 (function () {
   var scriptFile = File($.fileName);
   var rootFolder = scriptFile.parent.parent;
@@ -103,51 +111,86 @@ function mbEnsureFolder(folder) {
   var receiptFile = new File(outFolder.fsName + "/receipt.json");
   var resultFile = new File(outFolder.fsName + "/execution-result.json");
   var receipt = mbReadJson(receiptFile);
+  var expectedRunId =
+    typeof $.global.__motionBuddyExpectedRunId === "string" && $.global.__motionBuddyExpectedRunId.length
+      ? $.global.__motionBuddyExpectedRunId
+      : null;
   var runId = receipt && typeof receipt.runId === "string" && receipt.runId.length ? receipt.runId : null;
+  var resultRunId = expectedRunId || runId;
+  var undoStarted = false;
 
   mbEnsureFolder(exchangeFolder);
   mbEnsureFolder(outFolder);
 
   if (!runId) {
-    alert("Motion Buddy could not find a valid receipt.json for the current run.");
+    if (resultRunId) {
+      mbWriteResult(resultFile, {
+        runId: resultRunId,
+        status: "error",
+        message: "Motion Buddy could not find a valid receipt.json for the requested run.",
+        executedAt: new Date().toUTCString(),
+        result: null
+      });
+    }
+    mbAlertUnlessSuppressed("Motion Buddy could not find a valid receipt.json for the current run.");
+    return;
+  }
+
+  if (expectedRunId && expectedRunId !== runId) {
+    mbWriteResult(resultFile, {
+      runId: expectedRunId,
+      status: "error",
+      message: "Motion Buddy receipt runId did not match the requested run. Expected " + expectedRunId + " but found " + runId + ".",
+      executedAt: new Date().toUTCString(),
+      result: null
+    });
+    mbAlertUnlessSuppressed("Motion Buddy refused to execute because the runId did not match the requested run.");
     return;
   }
 
   if (!generatedScriptFile.exists) {
     mbWriteResult(resultFile, {
-      runId: runId,
+      runId: resultRunId,
       status: "error",
       message: "No generated-script.jsx file was found.",
       executedAt: new Date().toUTCString(),
       result: null
     });
-    alert("Motion Buddy could not find a generated script.");
+    mbAlertUnlessSuppressed("Motion Buddy could not find a generated script.");
     return;
   }
 
   $.global.__motionBuddyResult = null;
-  $.global.__motionBuddyRunId = runId;
+  $.global.__motionBuddyRunId = resultRunId;
 
   try {
+    app.beginUndoGroup("Motion Buddy Action");
+    undoStarted = true;
     $.evalFile(generatedScriptFile);
     mbWriteResult(resultFile, {
-      runId: runId,
+      runId: resultRunId,
       status: "ok",
       message: "Generated script executed successfully.",
       executedAt: new Date().toUTCString(),
       result: $.global.__motionBuddyResult
     });
-    alert("Motion Buddy executed the generated script.");
+    mbAlertUnlessSuppressed("Motion Buddy executed the generated script.");
   } catch (error) {
     var structuredResult = $.global.__motionBuddyResult || null;
     var message = error && error.toString ? error.toString() : String(error);
     mbWriteResult(resultFile, {
-      runId: runId,
+      runId: resultRunId,
       status: "error",
       message: message,
       executedAt: new Date().toUTCString(),
       result: structuredResult
     });
-    alert("Motion Buddy script failed:\n" + message);
+    mbAlertUnlessSuppressed("Motion Buddy script failed:\n" + message);
+  } finally {
+    if (undoStarted) {
+      try {
+        app.endUndoGroup();
+      } catch (_undoError) {}
+    }
   }
 })();
