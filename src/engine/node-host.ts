@@ -3,7 +3,7 @@ import path from "node:path";
 
 import type {
   AEContext,
-  ExecutionReceipt,
+  ExecutionFeedbackReadResult,
   ExecutionResult,
   GeneratedPlan,
   LoggedRun,
@@ -11,14 +11,60 @@ import type {
   RunLogEntry,
 } from "../shared/types.js";
 import { parseAeContext } from "../shared/ae-context.js";
+import { createExecutionReceipt, createRunLogEntry, parseExecutionResult, parseRunLogEntry } from "../shared/run-files.js";
+import { generatePlan } from "../core/generator.js";
 import type { EngineHost } from "./contracts.js";
 import { getConfig } from "./config.js";
 
-function createLogId(timestamp: string) {
-  return timestamp.replace(/[:.]/g, "-");
+async function atomicWriteText(filePath: string, contents: string) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+
+  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    await fs.writeFile(tempPath, contents, "utf8");
+    await fs.rename(tempPath, filePath);
+  } catch (error) {
+    await fs.rm(tempPath, { force: true }).catch(() => undefined);
+    throw error;
+  }
 }
 
-export function createNodeEngineHost(config: MotionBuddyRuntimeConfig = getConfig()): EngineHost {
+async function removeIfExists(filePath: string) {
+  try {
+    await fs.rm(filePath, { force: true });
+  } catch {
+    // Best effort cleanup only.
+  }
+}
+
+async function readJsonFile(filePath: string): Promise<
+  | { status: "missing" }
+  | { status: "invalid"; message: string }
+  | { status: "ok"; value: unknown }
+> {
+  try {
+    const raw = await fs.readFile(filePath, "utf8");
+    return {
+      status: "ok",
+      value: JSON.parse(raw) as unknown,
+    };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return { status: "missing" };
+    }
+
+    return {
+      status: "invalid",
+      message: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export function createNodeEngineHost(
+  config: MotionBuddyRuntimeConfig = getConfig(),
+  openAiApiKey = process.env.OPENAI_API_KEY ?? "",
+): EngineHost {
+
   return {
     config,
     async ensureWorkspace() {
@@ -34,64 +80,82 @@ export function createNodeEngineHost(config: MotionBuddyRuntimeConfig = getConfi
         return parseAeContext(null);
       }
     },
-    async createRunLog(params) {
-      const timestamp = new Date().toISOString();
-      const id = createLogId(timestamp);
-      const logPath = path.join(config.logsDir, `${id}.json`);
-
-      const entry: RunLogEntry = {
-        id,
-        timestamp,
+    async generatePlan(params) {
+      return generatePlan({
         prompt: params.prompt,
-        exportedContext: params.context,
-        explanation: params.generatedPlan.explanation,
-        source: params.generatedPlan.source,
-        actionPlan: params.generatedPlan.actionPlan,
-        validation: params.generatedPlan.validation,
-        renderedScript: params.generatedPlan.renderedScript,
-        executionResult: null,
-      };
+        context: params.context,
+        model: params.model,
+        apiKey: openAiApiKey,
+      });
+    },
+    async createRunLog(params) {
+      const logPath = path.join(config.logsDir, `${params.runId}.json`);
+      const entry = createRunLogEntry({
+        runId: params.runId,
+        prompt: params.prompt,
+        generatedPlan: params.generatedPlan,
+        context: params.context,
+      });
 
-      await fs.mkdir(config.logsDir, { recursive: true });
-      await fs.writeFile(logPath, JSON.stringify(entry, null, 2), "utf8");
+      await atomicWriteText(logPath, JSON.stringify(entry, null, 2));
 
       return logPath;
     },
     async finalizeRunLog(logPath, executionResult) {
-      try {
-        const raw = await fs.readFile(logPath, "utf8");
-        const existing = JSON.parse(raw) as RunLogEntry;
-        existing.executionResult = executionResult;
-        await fs.writeFile(logPath, JSON.stringify(existing, null, 2), "utf8");
-      } catch {
-        // Logging should not block the execution path.
+      const rawLog = await readJsonFile(logPath);
+      if (rawLog.status !== "ok") {
+        return;
       }
+
+      const parsedLog = parseRunLogEntry(rawLog.value);
+      if (!parsedLog.value) {
+        return;
+      }
+
+      parsedLog.value.executionResult = executionResult;
+      await atomicWriteText(logPath, JSON.stringify(parsedLog.value, null, 2)).catch(() => undefined);
     },
     async writeExecutionBundle(params: {
+      runId: string;
       generatedPlan: GeneratedPlan;
       context: AEContext;
     }) {
-      const receipt: ExecutionReceipt = {
-        prompt: params.generatedPlan.prompt,
-        explanation: params.generatedPlan.explanation,
-        source: params.generatedPlan.source,
-        createdAt: new Date().toISOString(),
+      const receipt = createExecutionReceipt({
+        runId: params.runId,
+        generatedPlan: params.generatedPlan,
         context: params.context,
-        actionPlan: params.generatedPlan.actionPlan,
-        validation: params.generatedPlan.validation,
-      };
+      });
 
-      await fs.writeFile(config.generatedPlanPath, JSON.stringify(params.generatedPlan.actionPlan, null, 2), "utf8");
-      await fs.writeFile(config.generatedScriptPath, params.generatedPlan.renderedScript, "utf8");
-      await fs.writeFile(config.receiptPath, JSON.stringify(receipt, null, 2), "utf8");
+      await removeIfExists(config.executionResultPath);
+      await atomicWriteText(config.generatedPlanPath, JSON.stringify(params.generatedPlan.actionPlan, null, 2));
+      await atomicWriteText(config.generatedScriptPath, params.generatedPlan.renderedScript);
+      await atomicWriteText(config.receiptPath, JSON.stringify(receipt, null, 2));
     },
-    async readExecutionResult() {
-      try {
-        const raw = await fs.readFile(config.executionResultPath, "utf8");
-        return JSON.parse(raw) as ExecutionResult;
-      } catch {
-        return null;
+    async readExecutionResult(runId): Promise<ExecutionFeedbackReadResult> {
+      const rawResult = await readJsonFile(config.executionResultPath);
+      if (rawResult.status !== "ok") {
+        return rawResult.status === "missing" ? rawResult : { status: "invalid", message: rawResult.message };
       }
+
+      const parsedResult = parseExecutionResult(rawResult.value);
+      if (!parsedResult.value) {
+        return {
+          status: "invalid",
+          message: parsedResult.errors.join(" | "),
+        };
+      }
+
+      if (parsedResult.value.runId !== runId) {
+        return {
+          status: "stale",
+          runId: parsedResult.value.runId,
+        };
+      }
+
+      return {
+        status: "ready",
+        result: parsedResult.value,
+      };
     },
     async listRunLogs() {
       try {
@@ -105,15 +169,24 @@ export function createNodeEngineHost(config: MotionBuddyRuntimeConfig = getConfi
         const logs = await Promise.all(
           files.map(async (name) => {
             const logPath = path.join(config.logsDir, name);
-            const raw = await fs.readFile(logPath, "utf8");
+            const rawLog = await readJsonFile(logPath);
+            if (rawLog.status !== "ok") {
+              return null;
+            }
+
+            const parsedLog = parseRunLogEntry(rawLog.value);
+            if (!parsedLog.value) {
+              return null;
+            }
+
             return {
-              ...(JSON.parse(raw) as RunLogEntry),
+              ...parsedLog.value,
               logPath,
             } satisfies LoggedRun;
           }),
         );
 
-        return logs;
+        return logs.filter((log): log is LoggedRun => log !== null);
       } catch {
         return [];
       }

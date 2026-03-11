@@ -75,21 +75,16 @@ export function App() {
           <div>
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-white/45">Session Controls</p>
             <p className="text-sm text-white/55">
-              The GUI uses the same planning engine as the CLI. Override the model or API key here for the current session if needed.
+              The GUI uses the same planning engine as the CLI. Model selection stays in the UI, while any configured OpenAI key remains host-side only.
             </p>
           </div>
           <div className="space-y-2">
             <label className="text-[11px] uppercase tracking-[0.22em] text-white/45">Model</label>
             <Input value={motionBuddy.model} onChange={(event) => motionBuddy.setModel(event.target.value)} placeholder="gpt-4.1-mini" />
           </div>
-          <div className="space-y-2">
-            <label className="text-[11px] uppercase tracking-[0.22em] text-white/45">OpenAI API Key</label>
-            <Input
-              type="password"
-              value={motionBuddy.apiKey}
-              onChange={(event) => motionBuddy.setApiKey(event.target.value)}
-              placeholder="Optional override"
-            />
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <p className="text-[11px] uppercase tracking-[0.22em] text-white/45">Provider</p>
+            <p className="mt-2 text-sm text-white">{motionBuddy.runtime?.openAiEnabled ? "OpenAI via host bridge" : "Rules fallback only"}</p>
           </div>
         </section>
 

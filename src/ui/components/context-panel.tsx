@@ -69,7 +69,7 @@ export function ContextPanel(props: {
               <span className="text-sm font-medium">Model</span>
             </div>
             <p className="text-sm text-white/80">{props.runtime?.model ?? "Unavailable"}</p>
-            <p className="mt-2 text-xs text-white/45">{props.runtime?.openAiApiKey ? "OpenAI enabled" : "Rules fallback only"}</p>
+            <p className="mt-2 text-xs text-white/45">{props.runtime?.openAiEnabled ? "OpenAI enabled via host bridge" : "Rules fallback only"}</p>
           </div>
         </div>
 

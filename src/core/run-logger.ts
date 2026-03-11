@@ -2,36 +2,38 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import type { ExecutionResult, GeneratedPlan, RunLogEntry } from "../types.js";
+import { createRunLogEntry, parseRunLogEntry } from "../shared/run-files.js";
 
-function createLogId(timestamp: string) {
-  return timestamp.replace(/[:.]/g, "-");
+async function atomicWriteText(filePath: string, contents: string) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+
+  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  try {
+    await fs.writeFile(tempPath, contents, "utf8");
+    await fs.rename(tempPath, filePath);
+  } catch (error) {
+    await fs.rm(tempPath, { force: true }).catch(() => undefined);
+    throw error;
+  }
 }
 
 export async function createRunLog(params: {
   logsDir: string;
+  runId: string;
   prompt: string;
   generatedPlan: GeneratedPlan;
   context: RunLogEntry["exportedContext"];
 }) {
-  const timestamp = new Date().toISOString();
-  const id = createLogId(timestamp);
-  const logPath = path.join(params.logsDir, `${id}.json`);
-
-  const entry: RunLogEntry = {
-    id,
-    timestamp,
+  const logPath = path.join(params.logsDir, `${params.runId}.json`);
+  const entry = createRunLogEntry({
+    runId: params.runId,
     prompt: params.prompt,
-    exportedContext: params.context,
-    explanation: params.generatedPlan.explanation,
-    source: params.generatedPlan.source,
-    actionPlan: params.generatedPlan.actionPlan,
-    validation: params.generatedPlan.validation,
-    renderedScript: params.generatedPlan.renderedScript,
-    executionResult: null,
-  };
+    generatedPlan: params.generatedPlan,
+    context: params.context,
+  });
 
   await fs.mkdir(params.logsDir, { recursive: true });
-  await fs.writeFile(logPath, JSON.stringify(entry, null, 2), "utf8");
+  await atomicWriteText(logPath, JSON.stringify(entry, null, 2));
 
   return logPath;
 }
@@ -39,9 +41,13 @@ export async function createRunLog(params: {
 export async function finalizeRunLog(logPath: string, executionResult: ExecutionResult | null) {
   try {
     const raw = await fs.readFile(logPath, "utf8");
-    const existing = JSON.parse(raw) as RunLogEntry;
+    const parsed = parseRunLogEntry(JSON.parse(raw) as unknown);
+    if (!parsed.value) {
+      return;
+    }
+    const existing = parsed.value;
     existing.executionResult = executionResult;
-    await fs.writeFile(logPath, JSON.stringify(existing, null, 2), "utf8");
+    await atomicWriteText(logPath, JSON.stringify(existing, null, 2));
   } catch {
     // Logging should never stop the execution loop.
   }

@@ -22,6 +22,6 @@ export function getConfig(rootDir = process.cwd()): MotionBuddyRuntimeConfig {
     exportContextScriptPath: path.join(rootDir, "after-effects", "export-context.jsx"),
     importScriptPath: path.join(rootDir, "after-effects", "import-generated-script.jsx"),
     model: process.env.MOTION_BUDDY_MODEL ?? "gpt-4.1-mini",
-    openAiApiKey: process.env.OPENAI_API_KEY ?? "",
+    openAiEnabled: Boolean(process.env.OPENAI_API_KEY),
   };
 }

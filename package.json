@@ -10,6 +10,7 @@
     "build:engine": "tsc -p tsconfig.engine.json",
     "build:ui": "vite build",
     "check": "tsc -p tsconfig.engine.json --noEmit && tsc -p tsconfig.ui.json --noEmit",
+    "test": "tsx --test src/engine/workflow.test.ts src/ui/lib/desktop-host.test.ts",
     "start": "node dist/index.js",
     "ui:dev": "vite",
     "preview": "vite preview",

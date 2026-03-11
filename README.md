@@ -48,7 +48,7 @@ It adds:
 - rendered JSX inspection
 - run history
 - execution feedback polling
-- session overrides for model and API key
+- model overrides with host-side OpenAI access
 
 ### CEP Panel Scaffold
 
@@ -107,8 +107,8 @@ Important files:
 - `.motion-buddy/context/ae-context.json`: exported AE context snapshot
 - `.motion-buddy/out/generated-plan.json`: structured ActionPlan for the current run
 - `.motion-buddy/out/generated-script.jsx`: JSX ready to run in AE
-- `.motion-buddy/out/receipt.json`: execution bundle metadata
-- `.motion-buddy/out/execution-result.json`: AE feedback written after execution
+- `.motion-buddy/out/receipt.json`: execution bundle metadata, including the durable `runId`
+- `.motion-buddy/out/execution-result.json`: AE feedback written after execution for the matching `runId`
 - `.motion-buddy/logs/*.json`: run history and audit trail
 
 ## Prerequisites
@@ -188,6 +188,8 @@ If the plan passes validation and you approve it, Motion Buddy writes:
 - `generated-script.jsx`
 - `receipt.json`
 
+Each bundle carries a `runId` that is echoed back by the AE bridge, so stale feedback files are ignored instead of being attached to the wrong run.
+
 Then, in After Effects, run:
 
 `after-effects/import-generated-script.jsx`
@@ -213,7 +215,7 @@ In the desktop UI you can:
 - open the export/import bridge scripts
 - browse run logs and execution feedback
 
-The desktop app polls for `execution-result.json` after you write a run and execute the AE import bridge.
+The desktop app polls for `execution-result.json` after you write a run and execute the AE import bridge. It only accepts feedback whose `runId` matches the active run.
 
 ## CEP Panel Scaffold
 
@@ -322,7 +324,7 @@ This makes prompt behavior inspectable and reproducible.
 
 Near-term logical next steps:
 
-- persist settings such as API key and model overrides
+- persist settings such as model overrides
 - improve execution status handling between AE and the desktop shell
 - productize the CEP panel flow
 - add release packaging and signing polish

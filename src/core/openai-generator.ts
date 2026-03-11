@@ -22,7 +22,7 @@ export async function generateWithOpenAi(params: {
   prompt: string;
   context: AEContext;
 }): Promise<PlannedResponse> {
-  const client = new OpenAI({ apiKey: params.apiKey, dangerouslyAllowBrowser: true });
+  const client = new OpenAI({ apiKey: params.apiKey });
   const response = await client.chat.completions.create({
     model: params.model,
     temperature: 0.1,

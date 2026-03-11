@@ -3,10 +3,19 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { writeTextFile } from "@tauri-apps/plugin-fs";
 import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 
-import type { LoggedRun, MotionBuddyRuntimeConfig } from "@/shared/types.js";
+import type { LoggedRun, MotionBuddyRuntimeConfig } from "../../shared/types.js";
 
 export async function getRuntimeConfig() {
   return invoke<MotionBuddyRuntimeConfig>("get_runtime_config");
+}
+
+export async function generateOpenAiPlan(params: {
+  model: string;
+  systemPrompt: string;
+  prompt: string;
+  context: unknown;
+}) {
+  return invoke<unknown>("generate_openai_plan", params);
 }
 
 export async function openDesktopPath(path: string) {

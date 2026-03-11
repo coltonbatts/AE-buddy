@@ -32,13 +32,13 @@ export function useMotionBuddy() {
   const [activeRun, setActiveRun] = useState<PreparedRun | null>(null);
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState("");
-  const [apiKey, setApiKey] = useState("");
   const [events, setEvents] = useState<UiEvent[]>([]);
   const [isReady, setIsReady] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const pollingRef = useRef<number | null>(null);
   const runRef = useRef<PreparedRun | null>(null);
+  const feedbackNoticeRef = useRef<string | null>(null);
 
   function addEvent(level: UiEvent["level"], title: string, detail?: string) {
     setEvents((current) => [createEvent(level, title, detail), ...current].slice(0, 40));
@@ -79,7 +79,6 @@ export function useMotionBuddy() {
         setHost(engineHost);
         setRuntime(engineHost.config);
         setModel(engineHost.config.model);
-        setApiKey(engineHost.config.openAiApiKey);
         await refreshContext(engineHost);
         await refreshHistory(engineHost);
         addEvent("success", "Desktop session ready", "Motion Buddy Studio loaded the workspace and current AE bridge files.");
@@ -115,7 +114,6 @@ export function useMotionBuddy() {
         host,
         prompt,
         model,
-        apiKey,
       });
 
       runRef.current = run;
@@ -152,17 +150,26 @@ export function useMotionBuddy() {
       run,
     });
 
-    if (!result) {
+    if (result.status === "missing" || result.status === "stale") {
       return;
     }
 
+    if (result.status === "invalid") {
+      if (feedbackNoticeRef.current !== result.message) {
+        feedbackNoticeRef.current = result.message;
+        addEvent("warning", "Execution feedback not readable yet", result.message);
+      }
+      return;
+    }
+
+    feedbackNoticeRef.current = null;
     stopPolling();
     setIsExecuting(false);
     await refreshHistory(engineHost);
     addEvent(
-      result.status === "ok" ? "success" : "error",
+      result.result.status === "ok" ? "success" : "error",
       "After Effects feedback received",
-      result.result?.summary ?? result.message,
+      result.result.result?.summary ?? result.result.message,
     );
   }
 
@@ -180,6 +187,7 @@ export function useMotionBuddy() {
     }
 
     setIsExecuting(true);
+    feedbackNoticeRef.current = null;
     await commitPreparedRun({
       host: engineHost,
       run,
@@ -201,6 +209,7 @@ export function useMotionBuddy() {
   function cancelRun() {
     stopPolling();
     setIsExecuting(false);
+    feedbackNoticeRef.current = null;
     setActiveRun(null);
     runRef.current = null;
     addEvent("warning", "Run cleared", "The current plan was dismissed from the execution panel.");
@@ -218,8 +227,6 @@ export function useMotionBuddy() {
     setPrompt,
     model,
     setModel,
-    apiKey,
-    setApiKey,
     events,
     isReady,
     isGenerating,

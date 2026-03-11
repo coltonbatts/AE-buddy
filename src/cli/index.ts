@@ -105,11 +105,12 @@ export async function main() {
   printSection(
     "Next Step",
     [
-      `1. In After Effects, run ${host.config.importScriptPath}`,
-      `2. The action plan lives at ${host.config.generatedPlanPath}`,
-      `3. The rendered script lives at ${host.config.generatedScriptPath}`,
-      `4. After AE finishes, Motion Buddy will read ${host.config.executionResultPath}`,
-      `5. This run is being logged at ${run.logPath}`,
+      `1. Run ID: ${run.runId}`,
+      `2. In After Effects, run ${host.config.importScriptPath}`,
+      `3. The action plan lives at ${host.config.generatedPlanPath}`,
+      `4. The rendered script lives at ${host.config.generatedScriptPath}`,
+      `5. After AE finishes, Motion Buddy will read ${host.config.executionResultPath}`,
+      `6. This run is being logged at ${run.logPath}`,
     ].join("\n"),
   );
 
@@ -122,20 +123,26 @@ export async function main() {
     run,
   });
 
-  if (!result) {
-    console.log("\nNo execution result found yet. The execution bundle is ready.");
+  if (result.status !== "ready") {
+    const message =
+      result.status === "missing"
+        ? "No execution result found yet. The execution bundle is ready."
+        : result.status === "stale"
+          ? `Ignoring stale execution result for run ${result.runId}.`
+          : `Execution result is unreadable: ${result.message}`;
+    console.log(`\n${message}`);
     return;
   }
 
-  const detail = result.result
+  const detail = result.result.result
     ? [
-        `${result.status.toUpperCase()}: ${result.message}`,
-        result.executedAt,
-        `Summary: ${result.result.summary}`,
-        `Actions: ${result.result.actionsExecuted.join(", ") || "None"}`,
-        `Targets: ${result.result.affectedTargets.join(", ") || "None"}`,
+        `${result.result.status.toUpperCase()}: ${result.result.message}`,
+        result.result.executedAt,
+        `Summary: ${result.result.result.summary}`,
+        `Actions: ${result.result.result.actionsExecuted.join(", ") || "None"}`,
+        `Targets: ${result.result.result.affectedTargets.join(", ") || "None"}`,
       ].join("\n")
-    : `${result.status.toUpperCase()}: ${result.message}\n${result.executedAt}`;
+    : `${result.result.status.toUpperCase()}: ${result.result.message}\n${result.result.executedAt}`;
 
   printSection("After Effects Feedback", detail);
 }

@@ -46,6 +46,26 @@ function mbEnsureFolder(folder) {
   }
 }
 
+function mbAtomicWriteJson(file, payload) {
+  var tempFile = new File(file.fsName + ".tmp");
+  tempFile.encoding = "UTF-8";
+
+  if (!tempFile.open("w")) {
+    throw new Error("Could not open temporary file for writing: " + tempFile.fsName);
+  }
+
+  tempFile.write(mbToJson(payload));
+  tempFile.close();
+
+  if (file.exists) {
+    file.remove();
+  }
+
+  if (!tempFile.rename(file.name)) {
+    throw new Error("Could not finalize file write for: " + file.fsName);
+  }
+}
+
 function mbLayerType(layer) {
   if (layer instanceof TextLayer) {
     return "text";
@@ -216,10 +236,7 @@ function mbActiveCameraName(comp) {
     context.notes.push("No active composition is open.");
   }
 
-  outputFile.encoding = "UTF-8";
-  outputFile.open("w");
-  outputFile.write(mbToJson(context));
-  outputFile.close();
+  mbAtomicWriteJson(outputFile, context);
 
   alert("Motion Buddy exported context to:\n" + outputFile.fsName);
 })();

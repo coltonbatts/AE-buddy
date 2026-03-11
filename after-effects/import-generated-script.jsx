@@ -41,10 +41,51 @@ function mbToJson(value) {
 }
 
 function mbWriteResult(file, payload) {
+  var tempFile = new File(file.fsName + ".tmp");
+  tempFile.encoding = "UTF-8";
+
+  if (!tempFile.open("w")) {
+    throw new Error("Could not open temporary result file.");
+  }
+
+  tempFile.write(mbToJson(payload));
+  tempFile.close();
+
+  if (file.exists) {
+    file.remove();
+  }
+
+  if (!tempFile.rename(file.name)) {
+    throw new Error("Could not finalize execution result write.");
+  }
+}
+
+function mbReadText(file) {
+  if (!file.exists) {
+    return null;
+  }
+
   file.encoding = "UTF-8";
-  file.open("w");
-  file.write(mbToJson(payload));
+  if (!file.open("r")) {
+    return null;
+  }
+
+  var contents = file.read();
   file.close();
+  return contents;
+}
+
+function mbReadJson(file) {
+  var contents = mbReadText(file);
+  if (contents === null) {
+    return null;
+  }
+
+  try {
+    return eval("(" + contents + ")");
+  } catch (_error) {
+    return null;
+  }
 }
 
 function mbEnsureFolder(folder) {
@@ -59,13 +100,22 @@ function mbEnsureFolder(folder) {
   var exchangeFolder = new Folder(rootFolder.fsName + "/.motion-buddy");
   var outFolder = new Folder(exchangeFolder.fsName + "/out");
   var generatedScriptFile = new File(outFolder.fsName + "/generated-script.jsx");
+  var receiptFile = new File(outFolder.fsName + "/receipt.json");
   var resultFile = new File(outFolder.fsName + "/execution-result.json");
+  var receipt = mbReadJson(receiptFile);
+  var runId = receipt && typeof receipt.runId === "string" && receipt.runId.length ? receipt.runId : null;
 
   mbEnsureFolder(exchangeFolder);
   mbEnsureFolder(outFolder);
 
+  if (!runId) {
+    alert("Motion Buddy could not find a valid receipt.json for the current run.");
+    return;
+  }
+
   if (!generatedScriptFile.exists) {
     mbWriteResult(resultFile, {
+      runId: runId,
       status: "error",
       message: "No generated-script.jsx file was found.",
       executedAt: new Date().toUTCString(),
@@ -76,10 +126,12 @@ function mbEnsureFolder(folder) {
   }
 
   $.global.__motionBuddyResult = null;
+  $.global.__motionBuddyRunId = runId;
 
   try {
     $.evalFile(generatedScriptFile);
     mbWriteResult(resultFile, {
+      runId: runId,
       status: "ok",
       message: "Generated script executed successfully.",
       executedAt: new Date().toUTCString(),
@@ -90,6 +142,7 @@ function mbEnsureFolder(folder) {
     var structuredResult = $.global.__motionBuddyResult || null;
     var message = error && error.toString ? error.toString() : String(error);
     mbWriteResult(resultFile, {
+      runId: runId,
       status: "error",
       message: message,
       executedAt: new Date().toUTCString(),

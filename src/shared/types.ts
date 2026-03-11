@@ -190,6 +190,7 @@ export interface GeneratedPlan {
 }
 
 export interface ExecutionReceipt {
+  runId: string;
   prompt: string;
   explanation: string;
   source: SourceType;
@@ -209,6 +210,7 @@ export interface ScriptExecutionResult {
 }
 
 export interface ExecutionResult {
+  runId: string;
   status: "ok" | "error";
   message: string;
   executedAt: string;
@@ -216,7 +218,7 @@ export interface ExecutionResult {
 }
 
 export interface RunLogEntry {
-  id: string;
+  runId: string;
   timestamp: string;
   prompt: string;
   exportedContext: AEContext;
@@ -242,9 +244,15 @@ export interface MotionBuddyRuntimeConfig {
   exportContextScriptPath: string;
   importScriptPath: string;
   model: string;
-  openAiApiKey: string;
+  openAiEnabled: boolean;
 }
 
 export interface LoggedRun extends RunLogEntry {
   logPath: string;
 }
+
+export type ExecutionFeedbackReadResult =
+  | { status: "missing" }
+  | { status: "invalid"; message: string }
+  | { status: "stale"; runId: string }
+  | { status: "ready"; result: ExecutionResult };

@@ -44,7 +44,8 @@ The deterministic planning stack stays in TypeScript and is shared by both surfa
 UI prompt
   -> shared workflow.prepareRun()
   -> load normalized AE context
-  -> generate ActionPlan
+  -> host adapter generates model plan if enabled
+  -> assign durable runId
   -> validate plan
   -> render JSX
   -> write run log
@@ -56,7 +57,7 @@ Execute
   -> write generated-script.jsx
   -> write receipt.json
   -> user runs AE import bridge
-  -> AE writes execution-result.json
+  -> AE writes execution-result.json with matching runId
   -> desktop poller reads feedback
   -> workflow.readExecutionFeedback()
   -> finalize stored log
@@ -100,12 +101,12 @@ Execute
 ## Tradeoffs
 
 - The desktop app still depends on the file bridge rather than direct AE IPC.
-- The UI currently allows a session API key override for local use because the shared TypeScript planner is used in the webview layer.
+- The renderer can choose models, but host-side commands own OpenAI access and the webview never receives the API key.
 - Tauri bundling polish is intentionally deferred so the repo focuses on the workflow and interface first.
 
 ## Next Logical Steps
 
-1. Add settings persistence for model and API key overrides.
+1. Add settings persistence for model selection.
 2. Replace polling with richer bridge status events if the AE side becomes more interactive.
 3. Add packaged app icons, signing metadata, and release automation.
 4. Introduce an AE panel integration once the file bridge is no longer the primary transport.

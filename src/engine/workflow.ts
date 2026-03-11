@@ -1,12 +1,11 @@
-import { generatePlan } from "../core/generator.js";
-import type { ExecutionResult, LoggedRun } from "../shared/types.js";
+import { createRunId } from "../shared/run-files.js";
+import type { ExecutionFeedbackReadResult, LoggedRun } from "../shared/types.js";
 import type { EngineHost, PreparedRun } from "./contracts.js";
 
 export async function prepareRun(params: {
   host: EngineHost;
   prompt: string;
   model?: string;
-  apiKey?: string;
 }): Promise<PreparedRun> {
   const prompt = params.prompt.trim();
   if (!prompt) {
@@ -15,20 +14,22 @@ export async function prepareRun(params: {
 
   await params.host.ensureWorkspace();
   const context = await params.host.loadContext();
-  const generatedPlan = await generatePlan({
+  const runId = createRunId();
+  const generatedPlan = await params.host.generatePlan({
     prompt,
     context,
     model: params.model ?? params.host.config.model,
-    apiKey: params.apiKey ?? params.host.config.openAiApiKey,
   });
 
   const logPath = await params.host.createRunLog({
+    runId,
     prompt,
     generatedPlan,
     context,
   });
 
   return {
+    runId,
     prompt,
     context,
     generatedPlan,
@@ -42,6 +43,7 @@ export async function commitPreparedRun(params: {
 }): Promise<void> {
   await params.host.ensureWorkspace();
   await params.host.writeExecutionBundle({
+    runId: params.run.runId,
     generatedPlan: params.run.generatedPlan,
     context: params.run.context,
   });
@@ -50,9 +52,13 @@ export async function commitPreparedRun(params: {
 export async function readExecutionFeedback(params: {
   host: EngineHost;
   run: PreparedRun;
-}): Promise<ExecutionResult | null> {
-  const result = await params.host.readExecutionResult();
-  await params.host.finalizeRunLog(params.run.logPath, result);
+}): Promise<ExecutionFeedbackReadResult> {
+  const result = await params.host.readExecutionResult(params.run.runId);
+
+  if (result.status === "ready") {
+    await params.host.finalizeRunLog(params.run.logPath, result.result);
+  }
+
   return result;
 }
 
