@@ -1,0 +1,27 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "allowSyntheticDefaultImports": true,
+    "noEmit": true
+  },
+  "include": [
+    "src/ui/**/*.ts",
+    "src/ui/**/*.tsx",
+    "src/engine/contracts.ts",
+    "src/engine/workflow.ts",
+    "src/shared/**/*.ts",
+    "src/core/**/*.ts"
+  ],
+  "exclude": [
+    "src/core/run-logger.ts"
+  ]
+}

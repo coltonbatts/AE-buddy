@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --background: 222 32% 7%;
+  --foreground: 210 40% 96%;
+  --card: 223 26% 10%;
+  --card-foreground: 210 40% 96%;
+  --primary: 189 93% 58%;
+  --primary-foreground: 220 48% 9%;
+  --secondary: 217 22% 17%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 220 20% 14%;
+  --muted-foreground: 215 16% 70%;
+  --accent: 22 95% 56%;
+  --accent-foreground: 25 100% 10%;
+  --destructive: 351 95% 65%;
+  --destructive-foreground: 355 100% 97%;
+  --border: 215 28% 18%;
+  --input: 215 28% 18%;
+  --ring: 189 93% 58%;
+  --radius: 1rem;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+pre,
+code {
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+}
+
+::selection {
+  background: rgba(34, 211, 238, 0.22);
+}

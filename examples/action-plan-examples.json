@@ -1,0 +1,95 @@
+[
+  {
+    "prompt": "Offset all selected layers by 5 frames",
+    "actionPlan": {
+      "version": "1.0",
+      "intent": "Offset the currently selected layers later in time.",
+      "summary": "Offset selected layers by 5 frames.",
+      "riskLevel": "low",
+      "assumptions": [
+        "The active composition contains the layers you want to offset."
+      ],
+      "warnings": [
+        "This changes layer start times, not the timing of existing keyframes."
+      ],
+      "actions": [
+        {
+          "type": "ensure_active_comp"
+        },
+        {
+          "type": "offset_selected_layers",
+          "frames": 5
+        }
+      ]
+    }
+  },
+  {
+    "prompt": "Add a subtle camera push to the current comp",
+    "actionPlan": {
+      "version": "1.0",
+      "intent": "Create or reuse a camera and animate a subtle push-in.",
+      "summary": "Ensure a camera and animate a short push-in.",
+      "riskLevel": "medium",
+      "assumptions": [
+        "The active composition is the one that should receive the camera move."
+      ],
+      "warnings": [
+        "This will add or reuse a camera layer in the active composition."
+      ],
+      "actions": [
+        {
+          "type": "ensure_active_comp"
+        },
+        {
+          "type": "ensure_camera",
+          "name": "Motion Buddy Camera",
+          "position": [960, 540, -1200],
+          "pointOfInterest": [960, 540, 0],
+          "autoOrient": "none"
+        },
+        {
+          "type": "animate_camera_push",
+          "startTimeSeconds": 0,
+          "durationSeconds": 2,
+          "startZ": -1200,
+          "endZ": -600,
+          "easeInfluence": 65
+        }
+      ]
+    }
+  },
+  {
+    "prompt": "Create a grid of shape layers and color it",
+    "actionPlan": {
+      "version": "1.0",
+      "intent": "Create a regular grid of shape layers in the active composition.",
+      "summary": "Create a centered 4x4 shape grid.",
+      "riskLevel": "medium",
+      "assumptions": [
+        "The active composition should receive new generated layers."
+      ],
+      "warnings": [
+        "This will add sixteen new shape layers to the active composition."
+      ],
+      "actions": [
+        {
+          "type": "ensure_active_comp"
+        },
+        {
+          "type": "create_shape_grid",
+          "rows": 4,
+          "columns": 4,
+          "boxSize": 120,
+          "spacingX": 220,
+          "spacingY": 220,
+          "palette": [
+            [0.9608, 0.3294, 0.298],
+            [0.9961, 0.7725, 0.2314],
+            [0.1765, 0.6745, 0.6431],
+            [0.149, 0.3529, 0.7216]
+          ]
+        }
+      ]
+    }
+  }
+]

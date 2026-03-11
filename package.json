@@ -1,0 +1,48 @@
+{
+  "name": "motion-buddy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AI motion graphics assistant prototype for Adobe After Effects",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "npm run build:engine && npm run build:ui",
+    "build:engine": "tsc -p tsconfig.engine.json",
+    "build:ui": "vite build",
+    "check": "tsc -p tsconfig.engine.json --noEmit && tsc -p tsconfig.ui.json --noEmit",
+    "start": "node dist/index.js",
+    "ui:dev": "vite",
+    "preview": "vite preview",
+    "app:dev": "tauri dev",
+    "app:build": "tauri build"
+  },
+  "dependencies": {
+    "@radix-ui/react-scroll-area": "^1.2.10",
+    "@radix-ui/react-separator": "^1.1.8",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-dialog": "^2.6.0",
+    "@tauri-apps/plugin-fs": "^2.4.5",
+    "@tauri-apps/plugin-opener": "^2.5.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.577.0",
+    "openai": "^4.104.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.10.1",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.4",
+    "autoprefixer": "^10.4.27",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
+  }
+}

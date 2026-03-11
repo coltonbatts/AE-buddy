@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Motion Buddy Studio",
+  "version": "0.1.0",
+  "identifier": "com.motionbuddy.studio",
+  "build": {
+    "beforeDevCommand": "npm run ui:dev",
+    "beforeBuildCommand": "npm run build:ui",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist-ui"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Motion Buddy Studio",
+        "width": 1600,
+        "height": 980,
+        "minWidth": 1180,
+        "minHeight": 760,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "capabilities": ["default"],
+      "csp": "default-src 'self' ipc: http://ipc.localhost; connect-src 'self' ipc: http://ipc.localhost https://api.openai.com; img-src 'self' data: asset: http://asset.localhost; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:;"
+    }
+  },
+  "bundle": {
+    "active": false,
+    "targets": "all"
+  }
+}

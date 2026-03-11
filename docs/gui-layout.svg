@@ -1,0 +1,40 @@
+<svg width="1440" height="900" viewBox="0 0 1440 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1440" height="900" rx="32" fill="#080B13"/>
+  <rect x="24" y="24" width="1392" height="92" rx="24" fill="#0E1422" stroke="#1E2A3F"/>
+  <text x="56" y="64" fill="#D7F6FF" font-size="24" font-family="Avenir Next, sans-serif">Motion Buddy Studio</text>
+  <text x="56" y="92" fill="#6B7B94" font-size="14" font-family="Avenir Next, sans-serif">After Effects planning with full script visibility</text>
+
+  <rect x="24" y="136" width="300" height="450" rx="24" fill="#0D1320" stroke="#1E2A3F"/>
+  <text x="48" y="174" fill="#7FE4F5" font-size="12" letter-spacing="2" font-family="IBM Plex Mono, monospace">LEFT PANEL</text>
+  <text x="48" y="204" fill="#F5F7FA" font-size="20" font-family="Avenir Next, sans-serif">AE Context</text>
+  <rect x="48" y="228" width="252" height="92" rx="16" fill="#111B2B"/>
+  <rect x="48" y="338" width="252" height="214" rx="16" fill="#111B2B"/>
+  <text x="64" y="260" fill="#D4DAE4" font-size="13" font-family="Avenir Next, sans-serif">Project metadata, frame rate, comp info</text>
+  <text x="64" y="366" fill="#D4DAE4" font-size="13" font-family="Avenir Next, sans-serif">Selected layers, layer types, camera presence</text>
+
+  <rect x="344" y="136" width="618" height="450" rx="24" fill="#0D1320" stroke="#1E2A3F"/>
+  <text x="368" y="174" fill="#7FE4F5" font-size="12" letter-spacing="2" font-family="IBM Plex Mono, monospace">CENTER PANEL</text>
+  <text x="368" y="204" fill="#F5F7FA" font-size="20" font-family="Avenir Next, sans-serif">Prompt + ActionPlan</text>
+  <rect x="368" y="228" width="570" height="130" rx="16" fill="#111B2B"/>
+  <rect x="368" y="378" width="570" height="174" rx="16" fill="#111B2B"/>
+  <text x="392" y="260" fill="#D4DAE4" font-size="13" font-family="Avenir Next, sans-serif">Large prompt input and Generate Plan action</text>
+  <text x="392" y="410" fill="#D4DAE4" font-size="13" font-family="Avenir Next, sans-serif">Structured ActionPlan preview and raw JSON toggle</text>
+
+  <rect x="982" y="136" width="434" height="450" rx="24" fill="#0D1320" stroke="#1E2A3F"/>
+  <text x="1006" y="174" fill="#7FE4F5" font-size="12" letter-spacing="2" font-family="IBM Plex Mono, monospace">RIGHT PANEL</text>
+  <text x="1006" y="204" fill="#F5F7FA" font-size="20" font-family="Avenir Next, sans-serif">Rendered JSX</text>
+  <rect x="1006" y="228" width="386" height="92" rx="16" fill="#111B2B"/>
+  <rect x="1006" y="338" width="386" height="214" rx="16" fill="#05070D"/>
+  <text x="1030" y="260" fill="#D4DAE4" font-size="13" font-family="Avenir Next, sans-serif">Explanation, dry run, execute, cancel, save</text>
+  <text x="1030" y="366" fill="#7FE4F5" font-size="13" font-family="IBM Plex Mono, monospace">const jsx = renderActionPlan(...)</text>
+
+  <rect x="24" y="606" width="1392" height="270" rx="24" fill="#0D1320" stroke="#1E2A3F"/>
+  <text x="48" y="644" fill="#7FE4F5" font-size="12" letter-spacing="2" font-family="IBM Plex Mono, monospace">BOTTOM PANEL</text>
+  <text x="48" y="674" fill="#F5F7FA" font-size="20" font-family="Avenir Next, sans-serif">Execution Feed</text>
+  <rect x="48" y="700" width="322" height="144" rx="16" fill="#111B2B"/>
+  <rect x="390" y="700" width="622" height="144" rx="16" fill="#111B2B"/>
+  <rect x="1032" y="700" width="360" height="144" rx="16" fill="#111B2B"/>
+  <text x="68" y="728" fill="#D4DAE4" font-size="13" font-family="Avenir Next, sans-serif">Prompt history</text>
+  <text x="410" y="728" fill="#D4DAE4" font-size="13" font-family="Avenir Next, sans-serif">Immediate execution logs, warnings, timestamps</text>
+  <text x="1052" y="728" fill="#D4DAE4" font-size="13" font-family="Avenir Next, sans-serif">Selected log summary</text>
+</svg>

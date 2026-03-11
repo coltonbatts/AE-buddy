@@ -1,0 +1,310 @@
+:root {
+  color-scheme: dark;
+  --bg: #151515;
+  --bg-elevated: rgba(33, 33, 35, 0.92);
+  --bg-console: rgba(13, 13, 15, 0.94);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-border-strong: rgba(255, 255, 255, 0.14);
+  --text-primary: #f3f4f6;
+  --text-muted: #a3a8b3;
+  --accent: #8cc8ff;
+  --accent-strong: #5eb3ff;
+  --danger: #ff7a7a;
+  --success: #8fe39f;
+  --shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+  --radius-lg: 22px;
+  --radius-md: 16px;
+  --radius-sm: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background:
+    radial-gradient(circle at top, rgba(94, 179, 255, 0.14), transparent 32%),
+    radial-gradient(circle at bottom right, rgba(255, 255, 255, 0.04), transparent 28%),
+    linear-gradient(180deg, #202022 0%, #141416 100%);
+  color: var(--text-primary);
+  font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.12;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.75), transparent);
+}
+
+.panel-shell {
+  min-height: 100vh;
+  padding: 18px;
+}
+
+.panel-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: calc(100vh - 36px);
+  padding: 20px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.panel-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.panel-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.panel-header h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.panel-copy {
+  margin: 0;
+  max-width: 28ch;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.panel-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field-label,
+.console-heading h2 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.prompt-input,
+.log-console {
+  width: 100%;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-md);
+  background: rgba(10, 10, 12, 0.6);
+  color: var(--text-primary);
+}
+
+.prompt-input {
+  resize: vertical;
+  min-height: 180px;
+  padding: 16px;
+  font: inherit;
+  line-height: 1.5;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.prompt-input:focus {
+  outline: none;
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 1px rgba(94, 179, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.prompt-input::placeholder {
+  color: rgba(163, 168, 179, 0.55);
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.generate-button,
+.ghost-button {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    opacity 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.generate-button {
+  padding: 12px 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent),
+    linear-gradient(135deg, #6abfff 0%, #4585ff 100%);
+  color: #09111d;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.generate-button:hover:not(:disabled),
+.ghost-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.generate-button:disabled,
+.ghost-button:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.14);
+}
+
+.status-pill[data-state="working"] .status-dot {
+  background: var(--accent-strong);
+  box-shadow: 0 0 0 8px rgba(94, 179, 255, 0.1);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.status-pill[data-state="success"] .status-dot {
+  background: var(--success);
+  box-shadow: 0 0 0 8px rgba(143, 227, 159, 0.09);
+}
+
+.status-pill[data-state="error"] .status-dot {
+  background: var(--danger);
+  box-shadow: 0 0 0 8px rgba(255, 122, 122, 0.08);
+}
+
+.console-wrap {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 180px;
+}
+
+.console-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ghost-button {
+  padding: 8px 12px;
+  background: transparent;
+  border-color: var(--panel-border);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.log-console {
+  flex: 1 1 auto;
+  min-height: 180px;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  background: var(--bg-console);
+  border-color: var(--panel-border-strong);
+  color: #d2d8e2;
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.16);
+  }
+}
+
+@media (max-width: 480px) {
+  .panel-shell {
+    padding: 12px;
+  }
+
+  .panel-card {
+    min-height: calc(100vh - 24px);
+    padding: 16px;
+  }
+
+  .panel-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .status-pill {
+    justify-content: center;
+  }
+
+  .generate-button,
+  .ghost-button {
+    width: 100%;
+  }
+}

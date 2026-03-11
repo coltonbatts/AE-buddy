@@ -1,0 +1,7 @@
+node_modules
+dist
+dist-ui
+src-tauri/target
+.env
+.motion-buddy
+.DS_Store
