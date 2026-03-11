@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { exists, mkdir, readTextFile, rename, writeTextFile } from "@tauri-apps/plugin-fs";
 
 import { commitPreparedRun, loadRunHistory, prepareRun, readExecutionFeedback } from "@/engine/workflow.js";
@@ -13,10 +13,18 @@ import {
   saveGeneratedPlanAsRecipe,
   toggleFavorite,
 } from "@/domain/persistence/command-store.js";
+import { createEmptyLiveState, isEmptyContextSnapshot, reduceLiveState } from "@/shared/ae-live.js";
 import { emptyContext } from "@/shared/ae-context.js";
-import type { AEContext, CommandStore, LoggedRun, MotionBuddyRuntimeConfig } from "@/shared/types.js";
+import type {
+  AEContext,
+  AEContextSnapshotReadResult,
+  AELiveState,
+  CommandStore,
+  LoggedRun,
+  MotionBuddyRuntimeConfig,
+} from "@/shared/types.js";
 import { createDesktopEngineHost } from "./desktop-host.js";
-import { triggerCepExecution } from "./desktop-api.js";
+import { triggerCepContextExport, triggerCepExecution } from "./desktop-api.js";
 
 export interface UiEvent {
   id: string;
@@ -44,10 +52,14 @@ const desktopStoreFs = {
   writeTextFile,
 };
 
+const CONTEXT_SYNC_INTERVAL_MS = 4000;
+
 export function useMotionBuddy() {
   const [host, setHost] = useState<EngineHost | null>(null);
   const [runtime, setRuntime] = useState<MotionBuddyRuntimeConfig | null>(null);
   const [context, setContext] = useState<AEContext | null>(null);
+  const [liveState, setLiveState] = useState<AELiveState>(createEmptyLiveState());
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [commandStore, setCommandStore] = useState<CommandStore>(createEmptyCommandStore());
   const [history, setHistory] = useState<LoggedRun[]>([]);
   const [selectedLogPath, setSelectedLogPath] = useState<string | null>(null);
@@ -59,9 +71,14 @@ export function useMotionBuddy() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const pollingRef = useRef<number | null>(null);
+  const contextPollingRef = useRef<number | null>(null);
+  const contextSyncInFlightRef = useRef(false);
   const runRef = useRef<PreparedRun | null>(null);
   const feedbackNoticeRef = useRef<string | null>(null);
   const commandStoreRef = useRef<CommandStore>(createEmptyCommandStore());
+  const liveStateRef = useRef<AELiveState>(createEmptyLiveState());
+  const contextRef = useRef<AEContext | null>(null);
+  const mountedRef = useRef(true);
 
   function addEvent(level: UiEvent["level"], title: string, detail?: string) {
     setEvents((current) => [createEvent(level, title, detail), ...current].slice(0, 40));
@@ -84,20 +101,127 @@ export function useMotionBuddy() {
     setSelectedLogPath((current) => current ?? logs[0]?.logPath ?? null);
   }
 
-  async function refreshContext(engineHost = host) {
-    if (!engineHost) {
-      return;
-    }
-
-    const nextContext = await engineHost.loadContext();
-    setContext(nextContext);
-  }
-
   function stopPolling() {
     if (pollingRef.current !== null) {
       window.clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
+  }
+
+  function stopContextPolling() {
+    if (contextPollingRef.current !== null) {
+      window.clearInterval(contextPollingRef.current);
+      contextPollingRef.current = null;
+    }
+  }
+
+  const syncAeContext = useEffectEvent(async (reason: "boot" | "poll" | "manual" | "planning") => {
+    const engineHost = host;
+    if (!engineHost || contextSyncInFlightRef.current || !mountedRef.current) {
+      return;
+    }
+
+    contextSyncInFlightRef.current = true;
+    const attemptedAt = new Date().toISOString();
+    let bridgeOk = false;
+    let errorMessage: string | null = null;
+    let snapshot: AEContextSnapshotReadResult = { status: "missing" };
+
+    try {
+      await triggerCepContextExport({
+        exportScriptPath: engineHost.config.exportContextScriptPath,
+        commandUrl: engineHost.config.cepCommandUrl,
+      });
+      bridgeOk = true;
+    } catch (error) {
+      errorMessage = error instanceof Error ? error.message : String(error);
+    }
+
+    try {
+      snapshot = await engineHost.readContextSnapshot();
+      const previousContext = contextRef.current;
+      const nextContext = snapshot.status === "ok" ? snapshot.context : previousContext;
+      const nextBridgeOk = bridgeOk && snapshot.status === "ok";
+      const nextSyncMode = nextBridgeOk ? "cep-polling" : "file-fallback";
+
+      if (snapshot.status === "missing") {
+        errorMessage = errorMessage ?? "AE Buddy could not find a context snapshot yet.";
+      } else if (snapshot.status === "invalid") {
+        errorMessage = errorMessage ?? `AE Buddy could not read the latest context snapshot: ${snapshot.message}`;
+      }
+
+      if (!mountedRef.current) {
+        return;
+      }
+
+      const provisionalLiveState = reduceLiveState(liveStateRef.current, {
+        context: nextContext,
+        bridgeOk: nextBridgeOk,
+        attemptedAt,
+        successfulSyncAt: null,
+        syncMode: nextSyncMode,
+        error: errorMessage,
+      });
+      const nextLiveState =
+        provisionalLiveState.status === "connected"
+          ? {
+              ...provisionalLiveState,
+              lastSuccessfulSyncAt: attemptedAt,
+            }
+          : provisionalLiveState;
+
+      const previousLiveState = liveStateRef.current;
+      liveStateRef.current = nextLiveState;
+      contextRef.current = nextContext;
+      setLiveState(nextLiveState);
+      setContext(nextContext);
+      setSelectedSessionId((current) => {
+        if (current && nextLiveState.sessions.some((session) => session.id === current)) {
+          return current;
+        }
+
+        return nextLiveState.activeSessionId ?? current;
+      });
+
+      if (reason === "manual") {
+        if (nextBridgeOk && nextContext && !isEmptyContextSnapshot(nextContext)) {
+          addEvent("success", "AE context refreshed", `${nextContext.projectName} is synced from the live bridge.`);
+        } else if (!nextBridgeOk) {
+          addEvent(
+            "warning",
+            "Live sync unavailable",
+            [
+              errorMessage ?? "The Motion Buddy CEP bridge did not respond.",
+              nextContext
+                ? `AE Buddy is showing the last readable snapshot from ${engineHost.config.contextPath}.`
+                : `No readable snapshot is available at ${engineHost.config.contextPath}.`,
+            ].join(" "),
+          );
+        }
+      } else if (previousLiveState.status !== nextLiveState.status) {
+        if (nextLiveState.status === "connected" && nextContext && !isEmptyContextSnapshot(nextContext)) {
+          addEvent("success", "Live AE sync connected", `${nextContext.projectName} is now updating through the CEP bridge.`);
+        } else if (nextLiveState.status === "stale") {
+          addEvent(
+            "warning",
+            "AE context is stale",
+            errorMessage ?? "AE Buddy is showing the last exported snapshot while it waits for a fresh bridge sync.",
+          );
+        } else if (nextLiveState.status === "disconnected") {
+          addEvent(
+            "warning",
+            "After Effects disconnected",
+            errorMessage ?? "Open the Motion Buddy Bridge panel in After Effects to resume live context updates.",
+          );
+        }
+      }
+    } finally {
+      contextSyncInFlightRef.current = false;
+    }
+  });
+
+  async function refreshContext() {
+    await syncAeContext("manual");
   }
 
   useEffect(() => {
@@ -117,7 +241,6 @@ export function useMotionBuddy() {
         const loadedStore = await loadCommandStore(desktopStoreFs, engineHost.config.commandStorePath);
         commandStoreRef.current = loadedStore;
         setCommandStore(loadedStore);
-        await refreshContext(engineHost);
         await refreshHistory(engineHost);
         addEvent("success", "Desktop session ready", "Motion Buddy Studio loaded the workspace and current AE bridge files.");
         setIsReady(true);
@@ -130,9 +253,27 @@ export function useMotionBuddy() {
 
     return () => {
       cancelled = true;
+      mountedRef.current = false;
       stopPolling();
+      stopContextPolling();
     };
   }, []);
+
+  useEffect(() => {
+    if (!host) {
+      return;
+    }
+
+    void syncAeContext("boot");
+    stopContextPolling();
+    contextPollingRef.current = window.setInterval(() => {
+      void syncAeContext("poll");
+    }, CONTEXT_SYNC_INTERVAL_MS);
+
+    return () => {
+      stopContextPolling();
+    };
+  }, [host, syncAeContext]);
 
   const selectedLog = useMemo(
     () => history.find((entry) => entry.logPath === selectedLogPath) ?? history[0] ?? null,
@@ -150,6 +291,10 @@ export function useMotionBuddy() {
   );
   const recentCommands = useMemo(() => commandStore.recentCommands.slice(0, 6), [commandStore.recentCommands]);
   const frequentCommands = useMemo(() => commandStore.usageStats.slice(0, 6), [commandStore.usageStats]);
+  const inspectedSession = useMemo(
+    () => liveState.sessions.find((session) => session.id === selectedSessionId) ?? liveState.sessions[0] ?? null,
+    [liveState.sessions, selectedSessionId],
+  );
 
   async function generatePlan() {
     if (!host || isGenerating || isExecuting) {
@@ -160,15 +305,18 @@ export function useMotionBuddy() {
     addEvent("info", "Refreshing AE context", "Using the latest exported context snapshot before planning.");
 
     try {
+      await syncAeContext("planning");
       const run = await prepareRun({
         host,
         prompt,
         model,
         store: commandStoreRef.current,
+        context: contextRef.current ?? context ?? undefined,
       });
 
       runRef.current = run;
       setActiveRun(run);
+      contextRef.current = run.context;
       setContext(run.context);
       await refreshHistory(host);
       setSelectedLogPath(run.logPath);
@@ -193,15 +341,18 @@ export function useMotionBuddy() {
     addEvent("info", "Running command", "Resolving the current palette input and validating before execution.");
 
     try {
+      await syncAeContext("planning");
       const run = await prepareRun({
         host,
         prompt,
         model,
         store: commandStoreRef.current,
+        context: contextRef.current ?? context ?? undefined,
       });
 
       runRef.current = run;
       setActiveRun(run);
+      contextRef.current = run.context;
       setContext(run.context);
       await refreshHistory(host);
       setSelectedLogPath(run.logPath);
@@ -407,6 +558,10 @@ export function useMotionBuddy() {
   return {
     runtime,
     context,
+    liveState,
+    inspectedSession,
+    selectedSessionId,
+    setSelectedSessionId,
     commandStore,
     paletteResults,
     recentCommands,

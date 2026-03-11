@@ -77,6 +77,7 @@ function emptyContext(): AEContext {
   return {
     exportedAt: new Date(0).toISOString(),
     projectName: "Untitled Project",
+    projectPath: null,
     activeComp: null,
     selectedLayers: [],
     notes: [
@@ -96,6 +97,7 @@ function normalizeContext(raw: unknown): AEContext {
   return {
     exportedAt: typeof value.exportedAt === "string" ? value.exportedAt : new Date(0).toISOString(),
     projectName: typeof value.projectName === "string" ? value.projectName : "Untitled Project",
+    projectPath: typeof value.projectPath === "string" && value.projectPath.trim() ? value.projectPath : null,
     activeComp: normalizeComp(value.activeComp),
     selectedLayers: Array.isArray(value.selectedLayers) ? value.selectedLayers.map(normalizeLayer) : [],
     notes: Array.isArray(value.notes) ? value.notes.filter((note): note is string => typeof note === "string") : [],
@@ -129,6 +131,7 @@ export function summarizeContext(context: AEContext): string {
 
   return [
     `Project: ${context.projectName}`,
+    `Project path: ${context.projectPath ?? "Unsaved project"}`,
     `Exported: ${context.exportedAt}`,
     `Active comp: ${activeComp}`,
     cameraInfo,

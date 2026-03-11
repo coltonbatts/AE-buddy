@@ -35,6 +35,8 @@ function createRuntimeConfig(rootDir: string, openAiEnabled: boolean): MotionBud
     exportContextScriptPath: path.join(rootDir, "after-effects", "export-context.jsx"),
     importScriptPath: path.join(rootDir, "after-effects", "import-generated-script.jsx"),
     cepCommandUrl: "http://127.0.0.1:9123/motion-buddy/execute",
+    cepHealthUrl: "http://127.0.0.1:9123/motion-buddy/health",
+    cepContextExportUrl: "http://127.0.0.1:9123/motion-buddy/context/export",
     model: "gpt-4.1-mini",
     openAiEnabled,
   };
@@ -110,4 +112,95 @@ test("desktop host uses host-side model generation when OpenAI is enabled", asyn
   assert.equal(plan.source, "openai");
   assert.equal(plan.actionPlan.summary, "Return a safe no-op plan.");
   assert.equal(plan.resolution.kind, "generated");
+});
+
+test("desktop host reports invalid context snapshots without collapsing them to an empty context", async () => {
+  const workspace = await createTempWorkspace();
+  const config = createRuntimeConfig(workspace, false);
+
+  await fs.mkdir(path.dirname(config.contextPath), { recursive: true });
+  await fs.writeFile(config.contextPath, "{invalid-json", "utf8");
+
+  const host = await createDesktopEngineHost({
+    getRuntimeConfig: async () => config,
+    join: async (...parts: string[]) => path.join(...parts),
+    fs: {
+      exists: async (targetPath) => {
+        try {
+          await fs.access(targetPath);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      mkdir: async (targetPath, options) => {
+        await fs.mkdir(targetPath, { recursive: options?.recursive });
+      },
+      readDir: async (targetPath) => {
+        const entries = await fs.readdir(targetPath, { withFileTypes: true });
+        return entries.map((entry: import("node:fs").Dirent) => ({
+          name: entry.name,
+          isFile: entry.isFile(),
+        }));
+      },
+      readTextFile: async (targetPath) => fs.readFile(targetPath, "utf8"),
+      remove: async (targetPath) => {
+        await fs.rm(targetPath, { force: true, recursive: true });
+      },
+      rename: async (oldPath, newPath) => {
+        await fs.rename(oldPath, newPath);
+      },
+      writeTextFile: async (targetPath, contents) => {
+        await fs.mkdir(path.dirname(targetPath), { recursive: true });
+        await fs.writeFile(targetPath, contents, "utf8");
+      },
+    },
+  });
+
+  const snapshot = await host.readContextSnapshot();
+  assert.equal(snapshot.status, "invalid");
+});
+
+test("desktop host reports missing context snapshots for no-CEP fallback", async () => {
+  const workspace = await createTempWorkspace();
+  const config = createRuntimeConfig(workspace, false);
+
+  const host = await createDesktopEngineHost({
+    getRuntimeConfig: async () => config,
+    join: async (...parts: string[]) => path.join(...parts),
+    fs: {
+      exists: async (targetPath) => {
+        try {
+          await fs.access(targetPath);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      mkdir: async (targetPath, options) => {
+        await fs.mkdir(targetPath, { recursive: options?.recursive });
+      },
+      readDir: async (targetPath) => {
+        const entries = await fs.readdir(targetPath, { withFileTypes: true });
+        return entries.map((entry: import("node:fs").Dirent) => ({
+          name: entry.name,
+          isFile: entry.isFile(),
+        }));
+      },
+      readTextFile: async (targetPath) => fs.readFile(targetPath, "utf8"),
+      remove: async (targetPath) => {
+        await fs.rm(targetPath, { force: true, recursive: true });
+      },
+      rename: async (oldPath, newPath) => {
+        await fs.rename(oldPath, newPath);
+      },
+      writeTextFile: async (targetPath, contents) => {
+        await fs.mkdir(path.dirname(targetPath), { recursive: true });
+        await fs.writeFile(targetPath, contents, "utf8");
+      },
+    },
+  });
+
+  const snapshot = await host.readContextSnapshot();
+  assert.deepEqual(snapshot, { status: "missing" });
 });

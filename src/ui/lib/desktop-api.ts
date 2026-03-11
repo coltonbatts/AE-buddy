@@ -31,6 +31,18 @@ export async function triggerCepExecution(params: {
   }>("trigger_cep_execution", params);
 }
 
+export async function triggerCepContextExport(params: {
+  exportScriptPath: string;
+  commandUrl?: string;
+}) {
+  return invoke<{
+    ok: boolean;
+    message: string;
+    endpoint?: string | null;
+    exportedAt?: string | null;
+  }>("trigger_cep_context_export", params);
+}
+
 export async function openDesktopPath(path: string) {
   await openPath(path);
 }

@@ -3,6 +3,7 @@ import path from "node:path";
 
 import type {
   AEContext,
+  AEContextSnapshotReadResult,
   ExecutionFeedbackReadResult,
   ExecutionResult,
   GeneratedPlan,
@@ -74,13 +75,20 @@ export function createNodeEngineHost(
       await fs.mkdir(config.logsDir, { recursive: true });
       await fs.mkdir(config.stateDir, { recursive: true });
     },
-    async loadContext() {
-      try {
-        const raw = await fs.readFile(config.contextPath, "utf8");
-        return parseAeContext(raw);
-      } catch {
-        return parseAeContext(null);
+    async readContextSnapshot(): Promise<AEContextSnapshotReadResult> {
+      const rawContext = await readJsonFile(config.contextPath);
+      if (rawContext.status !== "ok") {
+        return rawContext.status === "missing" ? rawContext : { status: "invalid", message: rawContext.message };
       }
+
+      return {
+        status: "ok",
+        context: parseAeContext(rawContext.value),
+      };
+    },
+    async loadContext() {
+      const snapshot = await this.readContextSnapshot();
+      return snapshot.status === "ok" ? snapshot.context : parseAeContext(null);
     },
     async generatePlan(params) {
       return resolveMotionRequest({

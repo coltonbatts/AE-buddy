@@ -130,3 +130,27 @@ test("malformed JSON bridge files do not crash history or feedback loading", asy
     assert.match(feedback.message, /JSON|Unexpected|expected/i);
   }
 });
+
+test("prepareRun uses the provided verified context instead of re-reading the bridge file", async () => {
+  const workspace = await createTempWorkspace();
+  const config = getConfig(workspace);
+  const host = createNodeEngineHost(config, "");
+  const verifiedContext = {
+    ...emptyContext(),
+    exportedAt: "2026-03-11T18:00:00.000Z",
+    projectName: "Verified Project.aep",
+    projectPath: "/tmp/Verified Project.aep",
+  };
+
+  await host.ensureWorkspace();
+  await fs.writeFile(config.contextPath, "{broken", "utf8");
+
+  const run = await prepareRun({
+    host,
+    prompt: "Create a camera if one does not exist.",
+    context: verifiedContext,
+  });
+
+  assert.equal(run.context.projectName, "Verified Project.aep");
+  assert.equal(run.context.projectPath, "/tmp/Verified Project.aep");
+});

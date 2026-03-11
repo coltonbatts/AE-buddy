@@ -6,6 +6,7 @@ import { systemPrompt } from "../../core/system-prompt.js";
 import { resolveMotionRequest } from "../../domain/resolve/resolve-motion-request.js";
 import type {
   AEContext,
+  AEContextSnapshotReadResult,
   ExecutionFeedbackReadResult,
   GeneratedPlan,
   LoggedRun,
@@ -104,12 +105,20 @@ export async function createDesktopEngineHost(overrides: Partial<DesktopHostDeps
       await deps.fs.mkdir(config.logsDir, { recursive: true });
       await deps.fs.mkdir(config.stateDir, { recursive: true });
     },
-    async loadContext() {
-      if (!(await deps.fs.exists(config.contextPath))) {
-        return parseAeContext(null);
+    async readContextSnapshot(): Promise<AEContextSnapshotReadResult> {
+      const rawContext = await readJsonFile(deps.fs, config.contextPath);
+      if (rawContext.status !== "ok") {
+        return rawContext.status === "missing" ? rawContext : { status: "invalid", message: rawContext.message };
       }
 
-      return parseAeContext(await deps.fs.readTextFile(config.contextPath));
+      return {
+        status: "ok",
+        context: parseAeContext(rawContext.value),
+      };
+    },
+    async loadContext() {
+      const snapshot = await this.readContextSnapshot();
+      return snapshot.status === "ok" ? snapshot.context : parseAeContext(null);
     },
     async generatePlan(params) {
       return resolveMotionRequest({

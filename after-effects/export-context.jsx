@@ -46,6 +46,10 @@ function mbEnsureFolder(folder) {
   }
 }
 
+function mbShouldSuppressAlerts() {
+  return $.global.__motionBuddySuppressAlerts === true;
+}
+
 function mbAtomicWriteJson(file, payload) {
   var tempFile = new File(file.fsName + ".tmp");
   tempFile.encoding = "UTF-8";
@@ -203,11 +207,6 @@ function mbActiveCameraName(comp) {
 
 (function () {
   var project = app.project;
-  if (!project) {
-    alert("Open an After Effects project first.");
-    return;
-  }
-
   var scriptFile = File($.fileName);
   var rootFolder = scriptFile.parent.parent;
   var exchangeFolder = new Folder(rootFolder.fsName + "/.motion-buddy");
@@ -219,13 +218,16 @@ function mbActiveCameraName(comp) {
 
   var context = {
     exportedAt: new Date().toISOString ? new Date().toISOString() : new Date().toUTCString(),
-    projectName: project.file ? project.file.displayName : "Unsaved Project",
+    projectName: project && project.file ? project.file.displayName : "Unsaved Project",
+    projectPath: project && project.file ? project.file.fsName : null,
     activeComp: null,
     selectedLayers: [],
     notes: []
   };
 
-  if (project.activeItem && project.activeItem instanceof CompItem) {
+  if (!project) {
+    context.notes.push("After Effects did not expose a project during this export.");
+  } else if (project.activeItem && project.activeItem instanceof CompItem) {
     var comp = project.activeItem;
     context.activeComp = {
       name: comp.name,
@@ -274,5 +276,7 @@ function mbActiveCameraName(comp) {
 
   mbAtomicWriteJson(outputFile, context);
 
-  alert("Motion Buddy exported context to:\n" + outputFile.fsName);
+  if (!mbShouldSuppressAlerts()) {
+    alert("Motion Buddy exported context to:\n" + outputFile.fsName);
+  }
 })();

@@ -21,6 +21,8 @@ struct RuntimeConfig {
     export_context_script_path: String,
     import_script_path: String,
     cep_command_url: String,
+    cep_health_url: String,
+    cep_context_export_url: String,
     model: String,
     open_ai_enabled: bool,
 }
@@ -35,11 +37,27 @@ struct CepTriggerPayload {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct CepContextExportPayload {
+    export_script_path: String,
+    command_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct CepTriggerResponse {
     ok: bool,
     message: String,
     run_id: Option<String>,
     endpoint: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CepContextExportResponse {
+    ok: bool,
+    message: String,
+    endpoint: Option<String>,
+    exported_at: Option<String>,
 }
 
 fn workspace_root() -> PathBuf {
@@ -60,6 +78,20 @@ fn stringify(path: PathBuf) -> String {
 fn default_cep_command_url() -> String {
     std::env::var("MOTION_BUDDY_CEP_URL")
         .unwrap_or_else(|_| "http://127.0.0.1:9123/motion-buddy/execute".to_string())
+}
+
+fn bridge_url_for_path(command_url: &str, path: &str) -> String {
+    if let Ok(mut url) = reqwest::Url::parse(command_url) {
+        url.set_path(path);
+        url.set_query(None);
+        return url.to_string();
+    }
+
+    if let Some((prefix, _)) = command_url.rsplit_once("/motion-buddy/") {
+        return format!("{prefix}{path}");
+    }
+
+    command_url.to_string()
 }
 
 fn extract_json_object(raw: &str) -> Result<&str, String> {
@@ -105,6 +137,7 @@ fn get_runtime_config() -> RuntimeConfig {
     let out_dir = exchange_dir.join("out");
     let logs_dir = exchange_dir.join("logs");
     let state_dir = exchange_dir.join("state");
+    let cep_command_url = default_cep_command_url();
 
     RuntimeConfig {
         root_dir: stringify(root_dir.clone()),
@@ -121,7 +154,9 @@ fn get_runtime_config() -> RuntimeConfig {
         command_store_path: stringify(state_dir.join("command-store.json")),
         export_context_script_path: stringify(root_dir.join("after-effects").join("export-context.jsx")),
         import_script_path: stringify(root_dir.join("after-effects").join("import-generated-script.jsx")),
-        cep_command_url: default_cep_command_url(),
+        cep_command_url: cep_command_url.clone(),
+        cep_health_url: bridge_url_for_path(&cep_command_url, "/motion-buddy/health"),
+        cep_context_export_url: bridge_url_for_path(&cep_command_url, "/motion-buddy/context/export"),
         model: std::env::var("MOTION_BUDDY_MODEL").unwrap_or_else(|_| "gpt-4.1-mini".to_string()),
         open_ai_enabled: std::env::var("OPENAI_API_KEY")
             .map(|value| !value.trim().is_empty())
@@ -236,6 +271,52 @@ async fn trigger_cep_execution(
     })
 }
 
+#[tauri::command]
+async fn trigger_cep_context_export(
+    #[allow(non_snake_case)]
+    exportScriptPath: String,
+    #[allow(non_snake_case)] commandUrl: Option<String>,
+) -> Result<CepContextExportResponse, String> {
+    let payload = CepContextExportPayload {
+        export_script_path: exportScriptPath,
+        command_url: commandUrl,
+    };
+    let command_endpoint = payload.command_url.unwrap_or_else(default_cep_command_url);
+    let endpoint = bridge_url_for_path(&command_endpoint, "/motion-buddy/context/export");
+
+    let response = reqwest::Client::builder()
+        .timeout(Duration::from_secs(3))
+        .build()
+        .map_err(|error| format!("Failed to create CEP HTTP client: {error}"))?
+        .post(&endpoint)
+        .json(&json!({
+            "exportScriptPath": payload.export_script_path,
+            "suppressAlerts": true
+        }))
+        .send()
+        .await
+        .map_err(|error| format!("Failed to reach the Motion Buddy CEP bridge at {endpoint}: {error}"))?;
+
+    let status = response.status();
+    let raw_body = response
+        .text()
+        .await
+        .map_err(|error| format!("Failed to read the CEP bridge response: {error}"))?;
+
+    if !status.is_success() {
+        let message = parse_cep_error(&raw_body);
+        return Err(if message.is_empty() {
+            format!("CEP bridge request failed with HTTP {status}.")
+        } else {
+            format!("CEP bridge request failed with HTTP {status}: {message}")
+        });
+    }
+
+    serde_json::from_str::<CepContextExportResponse>(&raw_body).map_err(|error| {
+        format!("CEP bridge returned invalid JSON: {error}. Response body: {raw_body}")
+    })
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -244,7 +325,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_runtime_config,
             generate_openai_plan,
-            trigger_cep_execution
+            trigger_cep_execution,
+            trigger_cep_context_export
         ])
         .run(tauri::generate_context!())
         .expect("error while running Motion Buddy Studio");

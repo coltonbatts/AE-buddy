@@ -1,5 +1,6 @@
 import type {
   AEContext,
+  AEContextSnapshotReadResult,
   CommandStore,
   ExecutionFeedbackReadResult,
   ExecutionResult,
@@ -12,6 +13,7 @@ import type {
 export interface EngineHost {
   readonly config: MotionBuddyRuntimeConfig;
   ensureWorkspace(): Promise<void>;
+  readContextSnapshot(): Promise<AEContextSnapshotReadResult>;
   loadContext(): Promise<AEContext>;
   generatePlan(params: {
     prompt: string;

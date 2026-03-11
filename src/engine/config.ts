@@ -9,6 +9,7 @@ export function getConfig(rootDir = process.cwd()): MotionBuddyRuntimeConfig {
   const logsDir = path.join(exchangeDir, "logs");
   const stateDir = path.join(exchangeDir, "state");
   const cepCommandUrl = process.env.MOTION_BUDDY_CEP_URL ?? "http://127.0.0.1:9123/motion-buddy/execute";
+  const cepBaseUrl = cepCommandUrl.replace(/\/motion-buddy\/execute$/, "");
 
   return {
     rootDir,
@@ -26,6 +27,8 @@ export function getConfig(rootDir = process.cwd()): MotionBuddyRuntimeConfig {
     exportContextScriptPath: path.join(rootDir, "after-effects", "export-context.jsx"),
     importScriptPath: path.join(rootDir, "after-effects", "import-generated-script.jsx"),
     cepCommandUrl,
+    cepHealthUrl: `${cepBaseUrl}/motion-buddy/health`,
+    cepContextExportUrl: `${cepBaseUrl}/motion-buddy/context/export`,
     model: process.env.MOTION_BUDDY_MODEL ?? "gpt-4.1-mini",
     openAiEnabled: Boolean(process.env.OPENAI_API_KEY),
   };

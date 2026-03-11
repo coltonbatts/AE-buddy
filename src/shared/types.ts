@@ -85,9 +85,42 @@ export interface CompContext {
 export interface AEContext {
   exportedAt: string;
   projectName: string;
+  projectPath: string | null;
   activeComp: CompContext | null;
   selectedLayers: LayerContext[];
   notes: string[];
+}
+
+export type AEContextSnapshotReadResult =
+  | { status: "ok"; context: AEContext }
+  | { status: "missing" }
+  | { status: "invalid"; message: string };
+
+export type AESyncStatus = "connected" | "stale" | "disconnected";
+export type AESyncMode = "cep-polling" | "file-fallback";
+
+export interface AESessionRecord {
+  id: string;
+  projectName: string;
+  projectPath: string | null;
+  activeCompName: string | null;
+  selectedLayerCount: number;
+  selectedKeyframeCount: number;
+  isActive: boolean;
+  isUnsaved: boolean;
+  lastSeenAt: string;
+  lastContext: AEContext;
+}
+
+export interface AELiveState {
+  sessions: AESessionRecord[];
+  activeSessionId: string | null;
+  status: AESyncStatus;
+  syncMode: AESyncMode;
+  lastSyncAttemptAt: string | null;
+  lastSuccessfulSyncAt: string | null;
+  lastContextExportAt: string | null;
+  lastError: string | null;
 }
 
 export interface EnsureActiveCompAction {
@@ -308,6 +341,8 @@ export interface MotionBuddyRuntimeConfig {
   exportContextScriptPath: string;
   importScriptPath: string;
   cepCommandUrl: string;
+  cepHealthUrl: string;
+  cepContextExportUrl: string;
   model: string;
   openAiEnabled: boolean;
 }

@@ -5,6 +5,7 @@
 
   var DEFAULT_PORT = 9123;
   var EXECUTE_PATH = "/motion-buddy/execute";
+  var CONTEXT_EXPORT_PATH = "/motion-buddy/context/export";
   var HEALTH_PATH = "/motion-buddy/health";
   var MAX_BODY_BYTES = 16 * 1024;
 
@@ -13,7 +14,8 @@
     port: DEFAULT_PORT,
     busy: false,
     queue: Promise.resolve(),
-    lastRunId: null
+    lastRunId: null,
+    lastContextExportAt: null
   };
 
   var dom = {};
@@ -201,8 +203,27 @@
         ok: true,
         message: "Motion Buddy CEP bridge is healthy.",
         endpoint: "http://127.0.0.1:" + state.port + EXECUTE_PATH,
-        runId: state.lastRunId
+        runId: state.lastRunId,
+        lastContextExportAt: state.lastContextExportAt
       });
+      return;
+    }
+
+    if (request.method === "POST" && pathname === CONTEXT_EXPORT_PATH) {
+      try {
+        var contextPayload = await readJsonBody(request);
+        validateContextPayload(contextPayload);
+
+        var exportResult = await exportContext(contextPayload);
+        sendJson(response, 200, exportResult);
+      } catch (error) {
+        var exportMessage = error && error.message ? error.message : String(error);
+        appendLog("Context export failed: " + exportMessage);
+        sendJson(response, error && error.httpStatus ? error.httpStatus : 400, {
+          ok: false,
+          message: exportMessage
+        });
+      }
       return;
     }
 
@@ -280,6 +301,16 @@
     }
   }
 
+  function validateContextPayload(payload) {
+    if (!payload || typeof payload !== "object") {
+      throw new Error("CEP bridge payload must be an object.");
+    }
+
+    if (typeof payload.exportScriptPath !== "string" || !payload.exportScriptPath.trim()) {
+      throw new Error("CEP bridge payload requires exportScriptPath.");
+    }
+  }
+
   function enqueueExecution(payload) {
     state.queue = state.queue.then(function () {
       return executeImport(payload);
@@ -319,6 +350,34 @@
     } finally {
       state.busy = false;
       updateMeta();
+    }
+  }
+
+  async function exportContext(payload) {
+    setStatus("working", "Syncing context");
+    appendLog("Exporting context via " + payload.exportScriptPath);
+
+    try {
+      var result = await runHostFunction("MotionBuddyCep.exportContext", [
+        payload.exportScriptPath,
+        payload.suppressAlerts === true
+      ]);
+
+      state.lastContextExportAt = new Date().toISOString();
+      updateMeta();
+      setStatus("ready", "Listening");
+      appendLog(result.message || "Motion Buddy CEP bridge refreshed context.");
+
+      return {
+        ok: true,
+        message: result.message || "Motion Buddy CEP bridge exported context.",
+        endpoint: "http://127.0.0.1:" + state.port + CONTEXT_EXPORT_PATH,
+        exportedAt: state.lastContextExportAt
+      };
+    } catch (error) {
+      setStatus("error", "Context sync failed");
+      error.httpStatus = 500;
+      throw error;
     }
   }
 

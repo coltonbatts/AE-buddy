@@ -1,5 +1,5 @@
 import { createRunId } from "../shared/run-files.js";
-import type { CommandStore, ExecutionFeedbackReadResult, LoggedRun } from "../shared/types.js";
+import type { AEContext, CommandStore, ExecutionFeedbackReadResult, LoggedRun } from "../shared/types.js";
 import type { EngineHost, PreparedRun } from "./contracts.js";
 
 export async function prepareRun(params: {
@@ -7,6 +7,7 @@ export async function prepareRun(params: {
   prompt: string;
   model?: string;
   store?: CommandStore | null;
+  context?: AEContext;
 }): Promise<PreparedRun> {
   const prompt = params.prompt.trim();
   if (!prompt) {
@@ -14,7 +15,7 @@ export async function prepareRun(params: {
   }
 
   await params.host.ensureWorkspace();
-  const context = await params.host.loadContext();
+  const context = params.context ?? (await params.host.loadContext());
   const runId = createRunId();
   const generatedPlan = await params.host.generatePlan({
     prompt,

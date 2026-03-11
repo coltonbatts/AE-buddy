@@ -95,3 +95,31 @@ MotionBuddyCep.executeImport = function (importScriptPath, expectedRunId, suppre
     $.global.__motionBuddySuppressAlerts = previousSuppressAlerts;
   }
 };
+
+MotionBuddyCep.exportContext = function (exportScriptPath, suppressAlerts) {
+  var exportFile = new File(mbNormalizePath(exportScriptPath));
+  var previousSuppressAlerts = $.global.__motionBuddySuppressAlerts;
+
+  try {
+    if (!exportScriptPath) {
+      throw new Error("No export-context.jsx path was provided.");
+    }
+
+    if (!exportFile.exists) {
+      throw new Error("Motion Buddy export bridge was not found at: " + exportFile.fsName);
+    }
+
+    $.global.__motionBuddySuppressAlerts = suppressAlerts === true;
+    $.evalFile(exportFile);
+
+    return mbRespond(true, "Motion Buddy context export executed.", {
+      exportScriptPath: exportFile.fsName
+    });
+  } catch (error) {
+    return mbRespond(false, error && error.toString ? error.toString() : String(error), {
+      exportScriptPath: exportFile.fsName
+    });
+  } finally {
+    $.global.__motionBuddySuppressAlerts = previousSuppressAlerts;
+  }
+};
