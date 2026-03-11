@@ -11,11 +11,13 @@ struct RuntimeConfig {
     context_dir: String,
     out_dir: String,
     logs_dir: String,
+    state_dir: String,
     context_path: String,
     generated_plan_path: String,
     generated_script_path: String,
     receipt_path: String,
     execution_result_path: String,
+    command_store_path: String,
     export_context_script_path: String,
     import_script_path: String,
     cep_command_url: String,
@@ -102,6 +104,7 @@ fn get_runtime_config() -> RuntimeConfig {
     let context_dir = exchange_dir.join("context");
     let out_dir = exchange_dir.join("out");
     let logs_dir = exchange_dir.join("logs");
+    let state_dir = exchange_dir.join("state");
 
     RuntimeConfig {
         root_dir: stringify(root_dir.clone()),
@@ -109,11 +112,13 @@ fn get_runtime_config() -> RuntimeConfig {
         context_dir: stringify(context_dir.clone()),
         out_dir: stringify(out_dir.clone()),
         logs_dir: stringify(logs_dir.clone()),
+        state_dir: stringify(state_dir.clone()),
         context_path: stringify(context_dir.join("ae-context.json")),
         generated_plan_path: stringify(out_dir.join("generated-plan.json")),
         generated_script_path: stringify(out_dir.join("generated-script.jsx")),
         receipt_path: stringify(out_dir.join("receipt.json")),
         execution_result_path: stringify(out_dir.join("execution-result.json")),
+        command_store_path: stringify(state_dir.join("command-store.json")),
         export_context_script_path: stringify(root_dir.join("after-effects").join("export-context.jsx")),
         import_script_path: stringify(root_dir.join("after-effects").join("import-generated-script.jsx")),
         cep_command_url: default_cep_command_url(),

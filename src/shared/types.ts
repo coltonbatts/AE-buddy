@@ -20,9 +20,17 @@ export type ActionType =
   | "ensure_camera"
   | "animate_camera_push"
   | "create_shape_grid"
-  | "apply_palette_to_selected_layers";
+  | "apply_palette_to_selected_layers"
+  | "center_anchor_point_on_selected_layers"
+  | "parent_selected_layers_to_null"
+  | "trim_selected_layers_to_playhead"
+  | "precompose_selected_layers"
+  | "easy_ease_selected_keyframes"
+  | "toggle_motion_blur_on_selected_layers"
+  | "create_text_layer";
 
-export type SourceType = "openai" | "rules";
+export type SourceType = "registry" | "openai" | "rules";
+export type ResolutionKind = "built-in-command" | "recipe" | "saved-recipe" | "generated";
 
 export type RgbColor = [number, number, number];
 export type Point3D = [number, number, number];
@@ -53,6 +61,7 @@ export interface LayerContext {
   shy: boolean;
   label: number;
   selectedProperties: string[];
+  selectedKeyframeCount: number;
   transform: TransformSnapshot;
   textValue?: string;
 }
@@ -66,6 +75,7 @@ export interface CompContext {
   workAreaStart: number;
   workAreaDuration: number;
   displayStartTime: number;
+  currentTime: number;
   numLayers: number;
   hasCamera: boolean;
   activeCameraName: string | null;
@@ -141,6 +151,40 @@ export interface ApplyPaletteToSelectedLayersAction {
   mode?: "cycle";
 }
 
+export interface CenterAnchorPointOnSelectedLayersAction {
+  type: "center_anchor_point_on_selected_layers";
+}
+
+export interface ParentSelectedLayersToNullAction {
+  type: "parent_selected_layers_to_null";
+  nullName?: string;
+}
+
+export interface TrimSelectedLayersToPlayheadAction {
+  type: "trim_selected_layers_to_playhead";
+}
+
+export interface PrecomposeSelectedLayersAction {
+  type: "precompose_selected_layers";
+  name?: string;
+  moveAllAttributes?: boolean;
+}
+
+export interface EasyEaseSelectedKeyframesAction {
+  type: "easy_ease_selected_keyframes";
+  easeInfluence?: number;
+}
+
+export interface ToggleMotionBlurOnSelectedLayersAction {
+  type: "toggle_motion_blur_on_selected_layers";
+}
+
+export interface CreateTextLayerAction {
+  type: "create_text_layer";
+  text?: string;
+  name?: string;
+}
+
 export type ActionPlanAction =
   | EnsureActiveCompAction
   | OffsetSelectedLayersAction
@@ -150,7 +194,14 @@ export type ActionPlanAction =
   | EnsureCameraAction
   | AnimateCameraPushAction
   | CreateShapeGridAction
-  | ApplyPaletteToSelectedLayersAction;
+  | ApplyPaletteToSelectedLayersAction
+  | CenterAnchorPointOnSelectedLayersAction
+  | ParentSelectedLayersToNullAction
+  | TrimSelectedLayersToPlayheadAction
+  | PrecomposeSelectedLayersAction
+  | EasyEaseSelectedKeyframesAction
+  | ToggleMotionBlurOnSelectedLayersAction
+  | CreateTextLayerAction;
 
 export interface ActionPlan {
   version: "1.0";
@@ -166,6 +217,14 @@ export interface PlannedResponse {
   explanation: string;
   actionPlan: ActionPlan;
   source: SourceType;
+}
+
+export interface PlanResolution {
+  kind: ResolutionKind;
+  title: string;
+  matchedQuery: string;
+  confidence: number;
+  id?: string;
 }
 
 export interface ValidationIssue {
@@ -187,6 +246,7 @@ export interface GeneratedPlan {
   validation: PlanValidationResult;
   renderedScript: string;
   source: SourceType;
+  resolution: PlanResolution;
 }
 
 export interface ExecutionReceipt {
@@ -194,6 +254,7 @@ export interface ExecutionReceipt {
   prompt: string;
   explanation: string;
   source: SourceType;
+  resolution: PlanResolution;
   createdAt: string;
   context: AEContext;
   actionPlan: ActionPlan;
@@ -224,6 +285,7 @@ export interface RunLogEntry {
   exportedContext: AEContext;
   explanation: string;
   source: SourceType;
+  resolution: PlanResolution;
   actionPlan: ActionPlan;
   validation: PlanValidationResult;
   renderedScript: string;
@@ -236,11 +298,13 @@ export interface MotionBuddyRuntimeConfig {
   contextDir: string;
   outDir: string;
   logsDir: string;
+  stateDir: string;
   contextPath: string;
   generatedPlanPath: string;
   generatedScriptPath: string;
   receiptPath: string;
   executionResultPath: string;
+  commandStorePath: string;
   exportContextScriptPath: string;
   importScriptPath: string;
   cepCommandUrl: string;
@@ -257,3 +321,45 @@ export type ExecutionFeedbackReadResult =
   | { status: "invalid"; message: string }
   | { status: "stale"; runId: string }
   | { status: "ready"; result: ExecutionResult };
+
+export interface CommandHistoryEntry {
+  id: string;
+  entityId: string;
+  commandId: string;
+  title: string;
+  kind: ResolutionKind;
+  resolutionType: ResolutionKind;
+  prompt: string;
+  source: SourceType;
+  recordedAt: string;
+}
+
+export interface CommandUsageStat {
+  entityId: string;
+  commandId: string;
+  title: string;
+  kind: ResolutionKind;
+  count: number;
+  lastRecordedAt: string;
+}
+
+export interface SavedRecipeRecord {
+  id: string;
+  title: string;
+  description: string;
+  prompt: string;
+  keywords: string[];
+  createdAt: string;
+  updatedAt: string;
+  source: SourceType;
+  actionPlan: ActionPlan;
+}
+
+export interface CommandStore {
+  version: "1.0";
+  updatedAt: string;
+  favoriteIds: string[];
+  recentCommands: CommandHistoryEntry[];
+  usageStats: CommandUsageStat[];
+  savedRecipes: SavedRecipeRecord[];
+}

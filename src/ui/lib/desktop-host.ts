@@ -2,8 +2,8 @@ import { join } from "@tauri-apps/api/path";
 import { exists, mkdir, readDir, readTextFile, remove, rename, writeTextFile } from "@tauri-apps/plugin-fs";
 
 import { parseModelResponse } from "../../core/action-plan-validator.js";
-import { generatePlanWithPlanner } from "../../core/planner.js";
 import { systemPrompt } from "../../core/system-prompt.js";
+import { resolveMotionRequest } from "../../domain/resolve/resolve-motion-request.js";
 import type {
   AEContext,
   ExecutionFeedbackReadResult,
@@ -102,6 +102,7 @@ export async function createDesktopEngineHost(overrides: Partial<DesktopHostDeps
       await deps.fs.mkdir(config.contextDir, { recursive: true });
       await deps.fs.mkdir(config.outDir, { recursive: true });
       await deps.fs.mkdir(config.logsDir, { recursive: true });
+      await deps.fs.mkdir(config.stateDir, { recursive: true });
     },
     async loadContext() {
       if (!(await deps.fs.exists(config.contextPath))) {
@@ -111,9 +112,10 @@ export async function createDesktopEngineHost(overrides: Partial<DesktopHostDeps
       return parseAeContext(await deps.fs.readTextFile(config.contextPath));
     },
     async generatePlan(params) {
-      return generatePlanWithPlanner({
+      return resolveMotionRequest({
         prompt: params.prompt,
         context: params.context,
+        store: params.store,
         requestModelPlan: config.openAiEnabled
           ? async () => {
               const raw = await deps.requestOpenAiPlan({

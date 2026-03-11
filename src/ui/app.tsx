@@ -101,7 +101,14 @@ export function App() {
             onPromptChange={motionBuddy.setPrompt}
             onGeneratePlan={motionBuddy.generatePlan}
             isGenerating={motionBuddy.isGenerating}
+            isExecuting={motionBuddy.isExecuting}
             activeRun={motionBuddy.activeRun}
+            paletteResults={motionBuddy.paletteResults}
+            recentCommands={motionBuddy.recentCommands}
+            frequentCommands={motionBuddy.frequentCommands}
+            onApplySuggestion={motionBuddy.applySuggestion}
+            onToggleFavorite={motionBuddy.toggleFavoriteCommand}
+            onRunPrompt={motionBuddy.runPrompt}
           />
           <ScriptPanel
             activeRun={motionBuddy.activeRun}
@@ -128,6 +135,7 @@ export function App() {
                 motionBuddy.addEvent("success", "Prompt history saved", path);
               }
             }}
+            onSaveRecipe={motionBuddy.saveCurrentPlanAsRecipe}
             onOpenImportScript={() => (motionBuddy.runtime ? openDesktopPath(motionBuddy.runtime.importScriptPath) : Promise.resolve())}
           />
         </section>

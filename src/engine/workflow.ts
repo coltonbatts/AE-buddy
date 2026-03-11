@@ -1,11 +1,12 @@
 import { createRunId } from "../shared/run-files.js";
-import type { ExecutionFeedbackReadResult, LoggedRun } from "../shared/types.js";
+import type { CommandStore, ExecutionFeedbackReadResult, LoggedRun } from "../shared/types.js";
 import type { EngineHost, PreparedRun } from "./contracts.js";
 
 export async function prepareRun(params: {
   host: EngineHost;
   prompt: string;
   model?: string;
+  store?: CommandStore | null;
 }): Promise<PreparedRun> {
   const prompt = params.prompt.trim();
   if (!prompt) {
@@ -19,6 +20,7 @@ export async function prepareRun(params: {
     prompt,
     context,
     model: params.model ?? params.host.config.model,
+    store: params.store,
   });
 
   const logPath = await params.host.createRunLog({

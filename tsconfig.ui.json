@@ -18,6 +18,7 @@
     "src/ui/**/*.tsx",
     "src/engine/contracts.ts",
     "src/engine/workflow.ts",
+    "src/domain/**/*.ts",
     "src/shared/**/*.ts",
     "src/core/**/*.ts"
   ],

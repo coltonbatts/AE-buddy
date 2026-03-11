@@ -4,6 +4,7 @@ import type {
   ExecutionReceipt,
   ExecutionResult,
   GeneratedPlan,
+  PlanResolution,
   PlanValidationResult,
   RunLogEntry,
   ScriptExecutionResult,
@@ -15,7 +16,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isSourceType(value: unknown): value is SourceType {
-  return value === "openai" || value === "rules";
+  return value === "registry" || value === "openai" || value === "rules";
 }
 
 function isStringArray(value: unknown): value is string[] {
@@ -43,6 +44,29 @@ function isPlanValidationResult(value: unknown): value is PlanValidationResult {
   );
 }
 
+function isPlanResolution(value: unknown): value is PlanResolution {
+  return (
+    isRecord(value) &&
+    (value.kind === "built-in-command" ||
+      value.kind === "recipe" ||
+      value.kind === "saved-recipe" ||
+      value.kind === "generated") &&
+    typeof value.title === "string" &&
+    typeof value.matchedQuery === "string" &&
+    typeof value.confidence === "number" &&
+    (value.id === undefined || typeof value.id === "string")
+  );
+}
+
+function fallbackResolution(source: SourceType, prompt: string): PlanResolution {
+  return {
+    kind: "generated",
+    title: source === "openai" ? "LLM-assisted plan" : source === "registry" ? "Registry plan" : "Rules fallback plan",
+    matchedQuery: prompt,
+    confidence: source === "openai" ? 0.5 : source === "registry" ? 0.8 : 0.3,
+  };
+}
+
 function baseRunFileChecks(value: Record<string, unknown>) {
   const errors: string[] = [];
 
@@ -59,7 +83,7 @@ function baseRunFileChecks(value: Record<string, unknown>) {
   }
 
   if (!isSourceType(value.source)) {
-    errors.push('source must be "openai" or "rules".');
+    errors.push('source must be "registry", "openai", or "rules".');
   }
 
   if (!isPlanValidationResult(value.validation)) {
@@ -97,6 +121,7 @@ export function createRunLogEntry(params: {
     exportedContext: params.context,
     explanation: params.generatedPlan.explanation,
     source: params.generatedPlan.source,
+    resolution: params.generatedPlan.resolution,
     actionPlan: params.generatedPlan.actionPlan,
     validation: params.generatedPlan.validation,
     renderedScript: params.generatedPlan.renderedScript,
@@ -115,6 +140,7 @@ export function createExecutionReceipt(params: {
     prompt: params.generatedPlan.prompt,
     explanation: params.generatedPlan.explanation,
     source: params.generatedPlan.source,
+    resolution: params.generatedPlan.resolution,
     createdAt: params.createdAt ?? new Date().toISOString(),
     context: params.context,
     actionPlan: params.generatedPlan.actionPlan,
@@ -142,6 +168,9 @@ export function parseExecutionReceipt(raw: unknown): { value?: ExecutionReceipt;
       prompt: raw.prompt as string,
       explanation: raw.explanation as string,
       source: raw.source as SourceType,
+      resolution: isPlanResolution(raw.resolution)
+        ? (raw.resolution as PlanResolution)
+        : fallbackResolution(raw.source as SourceType, raw.prompt as string),
       createdAt: raw.createdAt as string,
       context: parseAeContext(raw.context),
       actionPlan: raw.actionPlan as ExecutionReceipt["actionPlan"],
@@ -226,6 +255,9 @@ export function parseRunLogEntry(raw: unknown): { value?: RunLogEntry; errors: s
       exportedContext: parseAeContext(raw.exportedContext),
       explanation: raw.explanation as string,
       source: raw.source as SourceType,
+      resolution: isPlanResolution(raw.resolution)
+        ? (raw.resolution as PlanResolution)
+        : fallbackResolution(raw.source as SourceType, raw.prompt as string),
       actionPlan: raw.actionPlan as RunLogEntry["actionPlan"],
       validation: raw.validation as PlanValidationResult,
       renderedScript: raw.renderedScript as string,

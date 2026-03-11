@@ -102,6 +102,40 @@ function mbSelectedProperties(layer) {
   return names;
 }
 
+function mbCountSelectedKeys(property) {
+  if (!property) {
+    return 0;
+  }
+
+  try {
+    if (property.selectedKeys && property.selectedKeys.length) {
+      return property.selectedKeys.length;
+    }
+  } catch (_error) {}
+
+  var count = 0;
+
+  try {
+    if (property.numProperties && property.numProperties > 0) {
+      for (var i = 1; i <= property.numProperties; i++) {
+        count += mbCountSelectedKeys(property.property(i));
+      }
+    }
+  } catch (_nestedError) {}
+
+  return count;
+}
+
+function mbSelectedKeyframeCount(layer) {
+  var total = 0;
+
+  for (var i = 0; i < layer.selectedProperties.length; i++) {
+    total += mbCountSelectedKeys(layer.selectedProperties[i]);
+  }
+
+  return total;
+}
+
 function mbTextValue(layer) {
   try {
     if (layer instanceof TextLayer) {
@@ -202,6 +236,7 @@ function mbActiveCameraName(comp) {
       workAreaStart: comp.workAreaStart,
       workAreaDuration: comp.workAreaDuration,
       displayStartTime: comp.displayStartTime,
+      currentTime: comp.time,
       numLayers: comp.numLayers,
       hasCamera: mbHasCamera(comp),
       activeCameraName: mbActiveCameraName(comp),
@@ -224,6 +259,7 @@ function mbActiveCameraName(comp) {
         shy: layer.shy,
         label: layer.label,
         selectedProperties: mbSelectedProperties(layer),
+        selectedKeyframeCount: mbSelectedKeyframeCount(layer),
         transform: mbTransformSnapshot(layer),
         textValue: mbTextValue(layer)
       });

@@ -17,6 +17,7 @@ function createRuntimeConfig(rootDir: string, openAiEnabled: boolean): MotionBud
   const contextDir = path.join(exchangeDir, "context");
   const outDir = path.join(exchangeDir, "out");
   const logsDir = path.join(exchangeDir, "logs");
+  const stateDir = path.join(exchangeDir, "state");
 
   return {
     rootDir,
@@ -24,11 +25,13 @@ function createRuntimeConfig(rootDir: string, openAiEnabled: boolean): MotionBud
     contextDir,
     outDir,
     logsDir,
+    stateDir,
     contextPath: path.join(contextDir, "ae-context.json"),
     generatedPlanPath: path.join(outDir, "generated-plan.json"),
     generatedScriptPath: path.join(outDir, "generated-script.jsx"),
     receiptPath: path.join(outDir, "receipt.json"),
     executionResultPath: path.join(outDir, "execution-result.json"),
+    commandStorePath: path.join(stateDir, "command-store.json"),
     exportContextScriptPath: path.join(rootDir, "after-effects", "export-context.jsx"),
     importScriptPath: path.join(rootDir, "after-effects", "import-generated-script.jsx"),
     cepCommandUrl: "http://127.0.0.1:9123/motion-buddy/execute",
@@ -106,4 +109,5 @@ test("desktop host uses host-side model generation when OpenAI is enabled", asyn
   assert.equal(requestCount, 1);
   assert.equal(plan.source, "openai");
   assert.equal(plan.actionPlan.summary, "Return a safe no-op plan.");
+  assert.equal(plan.resolution.kind, "generated");
 });

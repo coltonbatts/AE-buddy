@@ -1,334 +1,224 @@
-# Motion Buddy
+# AE Buddy
 
-Motion Buddy is a local AI assistant for Adobe After Effects.
+AE Buddy is a local-first desktop assistant for Adobe After Effects. The product direction is "Raycast for After Effects": a fast command palette, deterministic command execution, context-aware actions, and an inspectable bridge into AE.
 
-It takes a natural-language prompt, reads exported After Effects context, produces a typed `ActionPlan`, validates that plan against the current AE state, renders deterministic JSX, and writes a reviewable execution bundle before anything is applied in After Effects.
+Today the repo ships a working foundation for that loop:
 
-The repository currently contains three surfaces built on the same engine:
+1. Export After Effects context.
+2. Search commands and recipes in the desktop palette.
+3. Resolve the request into a built-in command, recipe, saved recipe, or planner fallback.
+4. Validate the resulting `ActionPlan`.
+5. Render deterministic JSX locally.
+6. Execute through the existing AE file bridge.
+7. Record run receipts, execution feedback, and local usage history.
 
-- a TypeScript CLI for prompt-first local workflows
-- a Tauri desktop app with a React UI for plan review, script inspection, and execution control
-- a scaffolded CEP panel extension for future in-app After Effects integration
+## Current Product Surface
 
-## What It Does
+### Desktop app
 
-Motion Buddy is designed around a transparent bridge workflow instead of hidden automation:
+The main product surface is a Tauri v2 desktop app with a React command-palette UI.
 
-1. Export context from After Effects.
-2. Generate a structured plan from a prompt.
-3. Validate the plan.
-4. Render deterministic JSX locally.
-5. Write an execution bundle into `.motion-buddy/out`.
-6. Apply that bundle in After Effects with the import bridge script.
-7. Read execution feedback back into the CLI or desktop app.
+Current capabilities:
 
-The goal is controllable AE automation with full visibility into what will run.
+- keyboard-first palette with live command matching
+- context-aware command availability
+- command preview with descriptions and validation feedback
+- recent commands and favorite commands
+- saved recipes stored locally
+- rendered JSX inspection before execution
+- run receipts and execution feedback polling
 
-## Current Surfaces
+### Shared engine
 
-### CLI
+The desktop app and CLI both use the same TypeScript engine for:
 
-The CLI uses the shared planning engine directly and is the fastest way to test prompts.
+- AE context loading and normalization
+- command resolution
+- plan validation
+- deterministic JSX rendering
+- execution bundle writing
+- run logging
 
-Use it when you want:
+### Bridge
 
-- terminal-first workflows
-- dry-run review before writing files
-- a simple prompt/confirm/apply loop
+AE Buddy still uses a local file bridge for reliability and inspectability:
 
-### Desktop App
+- `after-effects/export-context.jsx` writes `.motion-buddy/context/ae-context.json`
+- the engine writes `.motion-buddy/out/generated-plan.json`
+- the engine writes `.motion-buddy/out/generated-script.jsx`
+- the engine writes `.motion-buddy/out/receipt.json`
+- `after-effects/import-generated-script.jsx` executes the generated JSX in After Effects
+- After Effects writes `.motion-buddy/out/execution-result.json`
 
-The desktop app wraps the same engine in a Tauri shell with a React interface.
+This is intentionally explicit. Generated JSX is reviewable, deterministic commands stay local, and stale results are rejected by `runId`.
 
-It adds:
+## Deterministic Command Pack
 
-- AE context inspection
-- prompt composition
-- ActionPlan review
-- rendered JSX inspection
-- run history
-- execution feedback polling
-- model overrides with host-side OpenAI access
+AE Buddy now includes a first built-in command pack that resolves without LLM generation when the request matches a known action.
 
-### CEP Panel Scaffold
+Implemented commands:
 
-There is also a new scaffold under `after-effects/cep-extension/` for a future native After Effects panel workflow. It is not yet wired into the main build or release process, but it provides the basic CEP structure, host script placeholders, and a `Generate & Apply` flow stub.
+- `Center Anchor Point`
+- `Parent To Null`
+- `Trim Layer To Playhead`
+- `Precompose Selection`
+- `Easy Ease Selected Keyframes`
+- `Toggle Motion Blur`
+- `Create Text Layer`
 
-## Supported Action Types
+Additional built-ins from the earlier prototype remain available:
 
-The current shared engine supports these action types:
+- `Offset Selected Layers`
+- `Convert Selection To 3D`
+- `Wiggle Position`
+- `Overshoot Scale`
+- `Ensure Camera`
+- `Create Shape Grid`
+- `Apply Palette`
 
-- `ensure_active_comp`
-- `offset_selected_layers`
-- `convert_selected_layers_to_3d`
-- `apply_expression_to_selected_property`
-- `animate_overshoot_scale_on_selected_layers`
-- `ensure_camera`
-- `animate_camera_push`
-- `create_shape_grid`
-- `apply_palette_to_selected_layers`
+Current built-in recipes:
 
-The local rules engine maps common prompt patterns to these actions. When `OPENAI_API_KEY` is configured, Motion Buddy can interpret a broader range of prompts, but it still resolves them into the same structured action vocabulary.
+- `Camera Push In`
+- `Title Pop Color`
 
-## Repository Layout
+Resolver order is fixed:
+
+1. built-in command
+2. built-in recipe
+3. saved recipe
+4. planner fallback
+
+## Architecture
+
+The codebase is now split into clear layers:
 
 ```text
-.
-├── after-effects/
-│   ├── cep-extension/            # Scaffolded CEP panel extension
-│   ├── export-context.jsx        # AE -> Motion Buddy context exporter
-│   └── import-generated-script.jsx
-├── docs/
-│   └── desktop-architecture.md
-├── examples/
-├── src/
-│   ├── ae/                       # AE-facing helpers
-│   ├── cli/                      # CLI entrypoint and prompt flow
-│   ├── core/                     # Planning, validation, rendering, model integration
-│   ├── engine/                   # Shared orchestration and host contracts
-│   ├── shared/                   # Shared types and AE context normalization
-│   └── ui/                       # React desktop UI
-├── src-tauri/                    # Tauri desktop shell
-├── .motion-buddy/                # Local runtime exchange artifacts
-├── Motion_Buddy_Quickstart.md
-└── README.md
+src/
+├── core/                     # Planner, schema, validator, JSX renderer
+├── domain/
+│   ├── commands/            # Built-in commands and recipes
+│   ├── context/             # Derived AE context model
+│   ├── persistence/         # Favorites, recents, saved recipes
+│   └── resolve/             # Input -> command/recipe/generated resolution
+├── engine/                  # Shared orchestration and host contracts
+├── shared/                  # Shared types and runtime contracts
+└── ui/                      # React desktop app
 ```
 
-## How The Bridge Works
+Supporting docs:
 
-Motion Buddy is file-based today. The engine expects a local `.motion-buddy` directory with these subfolders:
+- [VNext architecture audit and migration plan](./docs/ae-buddy-vnext-architecture.md)
+- [Desktop architecture notes](./docs/desktop-architecture.md)
 
-- `.motion-buddy/context`
-- `.motion-buddy/out`
-- `.motion-buddy/logs`
+## Local Data Model
 
-Important files:
+AE Buddy is local-first. Runtime state is stored under `.motion-buddy/`.
 
-- `.motion-buddy/context/ae-context.json`: exported AE context snapshot
-- `.motion-buddy/out/generated-plan.json`: structured ActionPlan for the current run
-- `.motion-buddy/out/generated-script.jsx`: JSX ready to run in AE
-- `.motion-buddy/out/receipt.json`: execution bundle metadata, including the durable `runId`
-- `.motion-buddy/out/execution-result.json`: AE feedback written after execution for the matching `runId`
-- `.motion-buddy/logs/*.json`: run history and audit trail
+- `.motion-buddy/context/`: AE context exports
+- `.motion-buddy/out/`: generated plan, JSX bundle, receipt, execution result
+- `.motion-buddy/logs/`: durable run history
+- `.motion-buddy/state/command-store.json`: recent commands, favorites, saved recipes, usage stats
 
-## Prerequisites
+## Requirements
 
-### Required
-
-- Node.js 20+ recommended
+- Node.js 20+
 - npm
 - Adobe After Effects
 
-### For Desktop App Development
+For desktop app development:
 
 - Rust toolchain
 - Tauri system prerequisites for your OS
 
-### Optional
+Optional:
 
-- `OPENAI_API_KEY` for broader prompt interpretation
+- `OPENAI_API_KEY` for planner fallback when a request does not match a built-in command or recipe
 
-Without an API key, Motion Buddy falls back to the built-in local rules engine.
+## Environment
 
-## Environment Variables
-
-Copy `.env.example` to `.env` and set any overrides you need.
+Copy `.env.example` to `.env` if you want model-backed fallback planning.
 
 ```bash
 OPENAI_API_KEY=
 MOTION_BUDDY_MODEL=gpt-4.1-mini
 ```
 
-Variables:
-
-- `OPENAI_API_KEY`: enables the OpenAI-backed planner
-- `MOTION_BUDDY_MODEL`: overrides the default model used by the planner
-
-## Installation
+## Install
 
 ```bash
 npm install
 ```
 
-## CLI Workflow
+## Development
 
-### 1. Export AE Context
-
-In After Effects, run:
-
-`after-effects/export-context.jsx`
-
-This writes the current composition and selected layer data to `.motion-buddy/context/ae-context.json`.
-
-### 2. Generate A Plan
-
-Run the CLI with a prompt:
-
-```bash
-npm run dev -- --prompt "Offset selected layers by 5 frames"
-```
-
-Useful flags:
-
-- `--prompt "<text>"`: provide the prompt directly
-- `--dry-run`: generate and validate without writing an execution bundle
-- `--yes`: skip confirmation prompts
-
-Example dry run:
-
-```bash
-npm run dev -- --prompt "Create a centered shape grid" --dry-run
-```
-
-### 3. Write And Apply The Bundle
-
-If the plan passes validation and you approve it, Motion Buddy writes:
-
-- `generated-plan.json`
-- `generated-script.jsx`
-- `receipt.json`
-
-Each bundle carries a `runId` that is echoed back by the AE bridge, so stale feedback files are ignored instead of being attached to the wrong run.
-
-Then, in After Effects, run:
-
-`after-effects/import-generated-script.jsx`
-
-That script executes the generated JSX and writes `execution-result.json`.
-
-## Desktop App Workflow
-
-Start the app:
+### Start the desktop app
 
 ```bash
 npm run app:dev
 ```
 
-In the desktop UI you can:
+### Start the CLI
 
-- inspect the current AE context
-- compose or edit prompts
-- generate a typed ActionPlan
-- inspect validation issues
-- inspect the rendered JSX
-- write the execution bundle
-- open the export/import bridge scripts
-- browse run logs and execution feedback
+```bash
+npm run dev -- --prompt "center anchor point"
+```
 
-The desktop app polls for `execution-result.json` after you write a run and execute the AE import bridge. It only accepts feedback whose `runId` matches the active run.
+### Typecheck
 
-## CEP Panel Scaffold
+```bash
+npm run check
+```
 
-The scaffold lives under:
+### Run tests
 
-`after-effects/cep-extension/`
+```bash
+npm test
+```
 
-Included files:
+## After Effects Workflow
 
-- `CSXS/manifest.xml`
-- `index.html`
-- `css/style.css`
-- `js/main.js`
-- `jsx/hostscript.jsx`
+### 1. Export context from AE
 
-Current status:
+Run:
 
-- the UI shell exists
-- the CSInterface flow is wired
-- `exportContext()` and `applyGeneratedScript()` are placeholders
-- `callMotionBuddyBackend()` is an HTTP stub
-- Adobe's `CSInterface.js` still needs to be copied into the extension folder
+`after-effects/export-context.jsx`
 
-See `after-effects/cep-extension/README.md` for setup details.
+This writes the current AE state, including active comp data, selected layers, playhead time, and selected keyframe counts.
 
-## Local Commands
+### 2. Run a command from AE Buddy
 
-- `npm run dev`: run the CLI
-- `npm run build`: build the engine and Vite UI assets
-- `npm run build:engine`: compile the shared TypeScript engine
-- `npm run build:ui`: build the React UI with Vite
-- `npm run check`: type-check engine and UI
-- `npm run start`: run the built Node output
-- `npm run ui:dev`: run the Vite UI in development
-- `npm run preview`: preview the built Vite UI
-- `npm run app:dev`: run the Tauri desktop app
-- `npm run app:build`: build the Tauri desktop app
+Examples:
 
-## Architecture Summary
+- `anchor`
+- `parent to null`
+- `trim`
+- `easy ease`
+- `motion blur`
+- `create text "Hello World"`
 
-### Shared Engine
+The palette searches titles, aliases, and keywords, then resolves the request against the local registry before considering planner fallback.
 
-The shared planning system lives in `src/core`, `src/shared`, and `src/engine`.
+### 3. Review validation and generated JSX
 
-Key responsibilities:
+AE Buddy validates the plan against the exported AE context before execution. If validation fails, execution is blocked and the error is surfaced in the UI.
 
-- prompt -> structured `ActionPlan`
-- plan validation against AE context
-- deterministic JSX rendering
-- execution bundle writing
-- run log creation and finalization
+### 4. Execute in After Effects
 
-### Host Adapters
+Run:
 
-- `src/engine/node-host.ts`: filesystem host used by the CLI
-- `src/ui/lib/desktop-host.ts`: Tauri-backed host used by the desktop app
+`after-effects/import-generated-script.jsx`
 
-### Desktop UI
+After Effects executes the generated JSX and writes back a matching `execution-result.json`.
 
-The desktop UI is implemented in `src/ui` and includes panels for:
+## Status
 
-- context
-- prompt and planning
-- rendered script and execution
-- log history and feedback
+AE Buddy has moved beyond a prompt-only prototype. The repo now has:
 
-See `docs/desktop-architecture.md` for the current design rationale.
+- a real command registry
+- context-aware command resolution
+- deterministic command execution for the first useful AE command pack
+- local palette persistence
+- command history and usage tracking
+- a stable bridge that can be improved later without rewriting the domain layer
 
-## Validation And Safety Model
-
-Motion Buddy does not execute arbitrary natural-language requests directly.
-
-Instead it:
-
-1. converts the prompt into a typed plan
-2. validates that plan against the exported AE context
-3. renders deterministic JSX from the validated action set
-4. requires an explicit user step before After Effects executes the script
-
-If validation fails, execution is blocked.
-
-## Logs And Debugging
-
-Each run is logged locally in `.motion-buddy/logs`.
-
-That log captures:
-
-- the prompt
-- exported context
-- generated explanation
-- structured ActionPlan
-- validation results
-- rendered JSX
-- execution feedback if available
-
-This makes prompt behavior inspectable and reproducible.
-
-## Known Limitations
-
-- The After Effects integration is still file-based.
-- The desktop app depends on exported context rather than direct AE IPC.
-- The CEP panel is scaffolded but not production-integrated yet.
-- Packaging, signing, and release automation are still minimal.
-
-## Roadmap Direction
-
-Near-term logical next steps:
-
-- persist settings such as model overrides
-- improve execution status handling between AE and the desktop shell
-- productize the CEP panel flow
-- add release packaging and signing polish
-
-## License
-
-No license file is included yet. Add one before publishing if you intend the repository to be reused publicly.
+Next major work is expanding recipes and motion memory on top of this foundation.

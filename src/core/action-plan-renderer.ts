@@ -6,10 +6,16 @@ import type {
   AnimateOvershootScaleOnSelectedLayersAction,
   ApplyExpressionToSelectedPropertyAction,
   ApplyPaletteToSelectedLayersAction,
+  CenterAnchorPointOnSelectedLayersAction,
+  CreateTextLayerAction,
   CreateShapeGridAction,
+  EasyEaseSelectedKeyframesAction,
   EnsureCameraAction,
   OffsetSelectedLayersAction,
+  ParentSelectedLayersToNullAction,
+  PrecomposeSelectedLayersAction,
   RgbColor,
+  TrimSelectedLayersToPlayheadAction,
 } from "../types.js";
 
 function escapeJsString(value: string) {
@@ -279,6 +285,192 @@ function renderApplyPalette(action: ApplyPaletteToSelectedLayersAction) {
   ].join("\n");
 }
 
+function renderCenterAnchorPointOnSelectedLayers(_action: CenterAnchorPointOnSelectedLayersAction) {
+  return [
+    "comp = mbRequireComp();",
+    "selectedLayers = mbRequireSelectedLayers(comp);",
+    "var mbAnchorAppliedCount = 0;",
+    "var mbAnchorSkippedCount = 0;",
+    "for (var i = 0; i < selectedLayers.length; i++) {",
+    "  if (mbCenterAnchorPoint(selectedLayers[i], comp.time)) {",
+    "    mbAnchorAppliedCount += 1;",
+    '    mbRecordTarget("layer:" + selectedLayers[i].name);',
+    "  } else {",
+    "    mbAnchorSkippedCount += 1;",
+    "  }",
+    "}",
+    "if (!mbAnchorAppliedCount) {",
+    '  throw new Error("No selected layers supported deterministic anchor centering.");',
+    "}",
+    "if (mbAnchorSkippedCount) {",
+    '  mbResult.warnings.push("Some selected layers could not be anchor-centered deterministically.");',
+    "}",
+    'mbResult.message = "Centered anchor points for the selected layers."; ',
+    'mbRecordAction("center_anchor_point_on_selected_layers");',
+  ].join("\n");
+}
+
+function renderParentSelectedLayersToNull(action: ParentSelectedLayersToNullAction, context: AEContext) {
+  const nullName = action.nullName ?? "AE Buddy Null";
+
+  return [
+    "comp = mbRequireComp();",
+    "selectedLayers = mbRequireSelectedLayers(comp);",
+    `var mbNull = comp.layers.addNull();`,
+    `mbNull.name = ${asJsString(nullName)};`,
+    "var mbNeeds3DNull = false;",
+    "for (var mbSelectionIndex = 0; mbSelectionIndex < selectedLayers.length; mbSelectionIndex++) {",
+    "  if (selectedLayers[mbSelectionIndex].threeDLayer) {",
+    "    mbNeeds3DNull = true;",
+    "    break;",
+    "  }",
+    "}",
+    "mbNull.threeDLayer = mbNeeds3DNull;",
+    "var mbAveragePosition = mbAverageSelectedLayerPosition(selectedLayers, mbNeeds3DNull);",
+    `mbNull.property("ADBE Transform Group").property("ADBE Position").setValue(mbAveragePosition);`,
+    "for (var i = 0; i < selectedLayers.length; i++) {",
+    "  if (selectedLayers[i] === mbNull) {",
+    "    continue;",
+    "  }",
+    "  selectedLayers[i].parent = mbNull;",
+    '  mbRecordTarget("layer:" + selectedLayers[i].name);',
+    "}",
+    'mbRecordTarget("layer:" + mbNull.name);',
+    'mbResult.message = "Parented the selected layers to a new null."; ',
+    'mbRecordAction("parent_selected_layers_to_null");',
+  ].join("\n");
+}
+
+function renderTrimSelectedLayersToPlayhead(action: TrimSelectedLayersToPlayheadAction, context: AEContext) {
+  const currentTime = round(context.activeComp?.currentTime ?? 0);
+
+  return [
+    "comp = mbRequireComp();",
+    "selectedLayers = mbRequireSelectedLayers(comp);",
+    `var mbTrimTime = ${currentTime};`,
+    "for (var i = 0; i < selectedLayers.length; i++) {",
+    "  var layer = selectedLayers[i];",
+    "  layer.outPoint = Math.max(layer.inPoint + (1 / Math.max(comp.frameRate, 1)), mbTrimTime);",
+    '  mbRecordTarget("layer:" + layer.name);',
+    "}",
+    'mbResult.message = "Trimmed selected layer out points to the playhead."; ',
+    'mbRecordAction("trim_selected_layers_to_playhead");',
+  ].join("\n");
+}
+
+function renderPrecomposeSelectedLayers(action: PrecomposeSelectedLayersAction) {
+  const name = action.name ?? "AE Buddy Precomp";
+  const moveAllAttributes = action.moveAllAttributes !== false;
+
+  return [
+    "comp = mbRequireComp();",
+    "selectedLayers = mbRequireSelectedLayers(comp);",
+    "var mbIndices = [];",
+    "for (var i = 0; i < selectedLayers.length; i++) {",
+    "  mbIndices.push(selectedLayers[i].index);",
+    '  mbRecordTarget("layer:" + selectedLayers[i].name);',
+    "}",
+    "mbIndices.sort(function (left, right) { return left - right; });",
+    `var mbPrecomp = comp.layers.precompose(mbIndices, ${asJsString(name)}, ${moveAllAttributes ? "true" : "false"});`,
+    'mbRecordTarget("comp:" + mbPrecomp.name);',
+    'mbResult.message = "Precomposed the selected layers."; ',
+    'mbRecordAction("precompose_selected_layers");',
+  ].join("\n");
+}
+
+function renderEasyEaseSelectedKeyframes(action: EasyEaseSelectedKeyframesAction) {
+  const easeInfluence = round(action.easeInfluence ?? 70);
+
+  return [
+    "comp = mbRequireComp();",
+    "selectedLayers = mbRequireSelectedLayers(comp);",
+    `var mbEase = new KeyframeEase(0, ${easeInfluence});`,
+    "var mbAppliedCount = 0;",
+    "for (var i = 0; i < selectedLayers.length; i++) {",
+    "  var layerProperties = [];",
+    "  mbCollectSelectedAnimatableProperties(selectedLayers[i].selectedProperties, layerProperties);",
+    "  for (var j = 0; j < layerProperties.length; j++) {",
+    "    var selectedProperty = layerProperties[j];",
+    "    if (!selectedProperty || !selectedProperty.selectedKeys || !selectedProperty.selectedKeys.length) {",
+    "      continue;",
+    "    }",
+    "    var mbDimensions = mbPropertyDimensions(selectedProperty);",
+    "    var mbEaseArray = [];",
+    "    for (var dimensionIndex = 0; dimensionIndex < mbDimensions; dimensionIndex++) {",
+    "      mbEaseArray.push(mbEase);",
+    "    }",
+    "    for (var keyIndex = 0; keyIndex < selectedProperty.selectedKeys.length; keyIndex++) {",
+    "      var selectedKey = selectedProperty.selectedKeys[keyIndex];",
+    "      selectedProperty.setTemporalEaseAtKey(selectedKey, mbEaseArray, mbEaseArray);",
+    "      mbAppliedCount += 1;",
+    "    }",
+    '    mbRecordTarget("layer:" + selectedLayers[i].name + ":" + selectedProperty.name);',
+    "  }",
+    "}",
+    "if (!mbAppliedCount) {",
+    '  throw new Error("No selected keyframes were found for Easy Ease.");',
+    "}",
+    'mbResult.message = "Applied Easy Ease to the selected keyframes."; ',
+    'mbRecordAction("easy_ease_selected_keyframes");',
+  ].join("\n");
+}
+
+function renderToggleMotionBlurOnSelectedLayers() {
+  return [
+    "comp = mbRequireComp();",
+    "selectedLayers = mbRequireSelectedLayers(comp);",
+    "var mbApplicableCount = 0;",
+    "var mbSkippedCount = 0;",
+    "var mbAllEnabled = true;",
+    "for (var i = 0; i < selectedLayers.length; i++) {",
+    "  var mbMotionBlurState = mbReadMotionBlurState(selectedLayers[i]);",
+    "  if (mbMotionBlurState !== null) {",
+    "    mbApplicableCount += 1;",
+    "    if (!mbMotionBlurState) {",
+    "      mbAllEnabled = false;",
+    "    }",
+    "  } else {",
+    "    mbSkippedCount += 1;",
+    "  }",
+    "}",
+    "if (!mbApplicableCount) {",
+    '  throw new Error("The selected layers do not support motion blur.");',
+    "}",
+    "var mbNextState = !mbAllEnabled;",
+    "comp.motionBlur = comp.motionBlur || mbNextState;",
+    "if (mbNextState) {",
+    '  mbRecordTarget("comp:" + comp.name);',
+    "}",
+    "for (var j = 0; j < selectedLayers.length; j++) {",
+    "  if (mbWriteMotionBlurState(selectedLayers[j], mbNextState)) {",
+    '    mbRecordTarget("layer:" + selectedLayers[j].name);',
+    "  }",
+    "}",
+    "if (mbSkippedCount) {",
+    '  mbResult.warnings.push("Some selected layers did not support motion blur changes.");',
+    "}",
+    'mbResult.message = mbNextState ? "Enabled motion blur for the selected layers." : "Disabled motion blur for the selected layers."; ',
+    'mbRecordAction("toggle_motion_blur_on_selected_layers");',
+  ].join("\n");
+}
+
+function renderCreateTextLayer(action: CreateTextLayerAction, context: AEContext) {
+  const centerX = Math.round((context.activeComp?.width ?? 1920) / 2);
+  const centerY = Math.round((context.activeComp?.height ?? 1080) / 2);
+  const text = action.text ?? "New Text";
+  const name = action.name ?? "AE Buddy Text";
+
+  return [
+    "comp = mbRequireComp();",
+    `var mbTextLayer = comp.layers.addText(${asJsString(text)});`,
+    `mbTextLayer.name = ${asJsString(name)};`,
+    `mbTextLayer.property("ADBE Transform Group").property("ADBE Position").setValue([${centerX}, ${centerY}]);`,
+    'mbRecordTarget("layer:" + mbTextLayer.name);',
+    'mbResult.message = "Created a new text layer."; ',
+    'mbRecordAction("create_text_layer");',
+  ].join("\n");
+}
+
 function renderAction(action: ActionPlanAction, context: AEContext) {
   switch (action.type) {
     case "ensure_active_comp":
@@ -299,6 +491,20 @@ function renderAction(action: ActionPlanAction, context: AEContext) {
       return renderCreateShapeGrid(action);
     case "apply_palette_to_selected_layers":
       return renderApplyPalette(action);
+    case "center_anchor_point_on_selected_layers":
+      return renderCenterAnchorPointOnSelectedLayers(action);
+    case "parent_selected_layers_to_null":
+      return renderParentSelectedLayersToNull(action, context);
+    case "trim_selected_layers_to_playhead":
+      return renderTrimSelectedLayersToPlayhead(action, context);
+    case "precompose_selected_layers":
+      return renderPrecomposeSelectedLayers(action);
+    case "easy_ease_selected_keyframes":
+      return renderEasyEaseSelectedKeyframes(action);
+    case "toggle_motion_blur_on_selected_layers":
+      return renderToggleMotionBlurOnSelectedLayers();
+    case "create_text_layer":
+      return renderCreateTextLayer(action, context);
   }
 }
 
@@ -385,6 +591,136 @@ export function renderActionPlan(plan: ActionPlan, context: AEContext) {
     "      return [ease, ease, ease];",
     "    }",
     "    return [ease, ease];",
+    "  }",
+    "",
+    "  function mbPropertyDimensions(property) {",
+    "    try {",
+    "      var value = property.value;",
+    "      return value && value.length ? value.length : 1;",
+    "    } catch (_error) {",
+    "      return 1;",
+    "    }",
+    "  }",
+    "",
+    "  function mbCollectSelectedAnimatableProperties(properties, output) {",
+    "    if (!properties) {",
+    "      return;",
+    "    }",
+    "    for (var i = 0; i < properties.length; i++) {",
+    "      var property = properties[i];",
+    "      if (!property) {",
+    "        continue;",
+    "      }",
+    "      try {",
+    "        if (property.selectedKeys && property.selectedKeys.length) {",
+    "          output.push(property);",
+    "          continue;",
+    "        }",
+    "      } catch (_selectedKeyError) {}",
+    "      try {",
+    "        if (property.numProperties && property.numProperties > 0) {",
+    "          var nested = [];",
+    "          for (var nestedIndex = 1; nestedIndex <= property.numProperties; nestedIndex++) {",
+    "            nested.push(property.property(nestedIndex));",
+    "          }",
+    "          mbCollectSelectedAnimatableProperties(nested, output);",
+    "        }",
+    "      } catch (_nestedPropertyError) {}",
+    "    }",
+    "  }",
+    "",
+    "  function mbCenterAnchorPoint(layer, sampleTime) {",
+    "    if (layer instanceof CameraLayer || layer instanceof LightLayer || layer.nullLayer) {",
+    "      return false;",
+    "    }",
+    "    var rect = null;",
+    "    try {",
+    "      rect = layer.sourceRectAtTime(sampleTime || 0, false);",
+    "    } catch (_error) {",
+    "      rect = null;",
+    "    }",
+    "    if (!rect || (!rect.width && !rect.height)) {",
+    "      try {",
+    "        if (typeof layer.width === 'number' && typeof layer.height === 'number') {",
+    "          rect = { left: 0, top: 0, width: layer.width, height: layer.height };",
+    "        }",
+    "      } catch (_layerSizeError) {}",
+    "    }",
+    "    if (!rect || (!rect.width && !rect.height)) {",
+    "      return false;",
+    "    }",
+    '    var transform = layer.property("ADBE Transform Group");',
+    '    var anchor = transform.property("ADBE Anchor Point");',
+    '    var position = transform.property("ADBE Position");',
+    "    if (!anchor || !position) {",
+    "      return false;",
+    "    }",
+    "    var currentAnchor = anchor.value;",
+    "    var currentPosition = position.value;",
+    "    var nextAnchor = [rect.left + rect.width / 2, rect.top + rect.height / 2];",
+    "    if (currentAnchor.length === 3) {",
+    "      nextAnchor = [nextAnchor[0], nextAnchor[1], currentAnchor[2]];",
+    "    }",
+    "    var delta = [];",
+    "    for (var i = 0; i < currentAnchor.length; i++) {",
+    "      delta[i] = nextAnchor[i] - currentAnchor[i];",
+    "    }",
+    "    try {",
+    "      anchor.setValue(nextAnchor);",
+    "      if (currentPosition.length >= 2) {",
+    "        var nextPosition = [];",
+    "        nextPosition[0] = currentPosition[0] + delta[0];",
+    "        nextPosition[1] = currentPosition[1] + delta[1];",
+    "        if (currentPosition.length === 3) {",
+    "          nextPosition[2] = currentPosition[2] + (delta[2] || 0);",
+    "        }",
+    "        position.setValue(nextPosition);",
+    "      }",
+    "      return true;",
+    "    } catch (_anchorCenteringError) {",
+    "      return false;",
+    "    }",
+    "  }",
+    "",
+    "  function mbAverageSelectedLayerPosition(layers, includeZ) {",
+    "    var totalX = 0;",
+    "    var totalY = 0;",
+    "    var totalZ = 0;",
+    "    var count = 0;",
+    "    for (var i = 0; i < layers.length; i++) {",
+    '      var position = layers[i].property("ADBE Transform Group").property("ADBE Position").value;',
+    "      totalX += position[0];",
+    "      totalY += position[1];",
+    "      totalZ += position.length > 2 ? position[2] : 0;",
+    "      count += 1;",
+    "    }",
+    "    if (!count) {",
+    "      return includeZ ? [comp.width / 2, comp.height / 2, 0] : [comp.width / 2, comp.height / 2];",
+    "    }",
+    "    if (includeZ) {",
+    "      return [totalX / count, totalY / count, totalZ / count];",
+    "    }",
+    "    return [totalX / count, totalY / count];",
+    "  }",
+    "",
+    "  function mbReadMotionBlurState(layer) {",
+    "    try {",
+    "      return typeof layer.motionBlur === 'boolean' ? layer.motionBlur : null;",
+    "    } catch (_motionBlurReadError) {",
+    "      return null;",
+    "    }",
+    "  }",
+    "",
+    "  function mbWriteMotionBlurState(layer, nextState) {",
+    "    try {",
+    "      if (typeof layer.motionBlur !== 'boolean') {",
+    "        return false;",
+    "      }",
+    "      layer.motionBlur = nextState;",
+    "      return true;",
+    "    } catch (_motionBlurWriteError) {",
+    "      return false;",
+    "    }",
     "  }",
     "",
     "  try {",

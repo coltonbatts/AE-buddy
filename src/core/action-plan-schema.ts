@@ -8,6 +8,13 @@ export const supportedActionTypes = [
   "animate_camera_push",
   "create_shape_grid",
   "apply_palette_to_selected_layers",
+  "center_anchor_point_on_selected_layers",
+  "parent_selected_layers_to_null",
+  "trim_selected_layers_to_playhead",
+  "precompose_selected_layers",
+  "easy_ease_selected_keyframes",
+  "toggle_motion_blur_on_selected_layers",
+  "create_text_layer",
 ] as const;
 
 export const actionPlanJsonSchema = {
@@ -155,6 +162,68 @@ export const actionPlanJsonSchema = {
                 },
               },
               mode: { const: "cycle" },
+            },
+          },
+          {
+            type: "object",
+            additionalProperties: false,
+            required: ["type"],
+            properties: {
+              type: { const: "center_anchor_point_on_selected_layers" },
+            },
+          },
+          {
+            type: "object",
+            additionalProperties: false,
+            required: ["type"],
+            properties: {
+              type: { const: "parent_selected_layers_to_null" },
+              nullName: { type: "string" },
+            },
+          },
+          {
+            type: "object",
+            additionalProperties: false,
+            required: ["type"],
+            properties: {
+              type: { const: "trim_selected_layers_to_playhead" },
+            },
+          },
+          {
+            type: "object",
+            additionalProperties: false,
+            required: ["type"],
+            properties: {
+              type: { const: "precompose_selected_layers" },
+              name: { type: "string" },
+              moveAllAttributes: { type: "boolean" },
+            },
+          },
+          {
+            type: "object",
+            additionalProperties: false,
+            required: ["type"],
+            properties: {
+              type: { const: "easy_ease_selected_keyframes" },
+              easeInfluence: { type: "number" },
+            },
+          },
+          {
+            type: "object",
+            additionalProperties: false,
+            required: ["type"],
+            properties: {
+              type: { const: "toggle_motion_blur_on_selected_layers" },
+            },
+          },
+          {
+            type: "object",
+            additionalProperties: false,
+            required: ["type"],
+            properties: {
+              type: { const: "create_text_layer" },
+              text: { type: "string" },
+              name: { type: "string" },
             },
           },
         ],

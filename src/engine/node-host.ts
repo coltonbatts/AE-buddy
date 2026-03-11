@@ -13,6 +13,7 @@ import type {
 import { parseAeContext } from "../shared/ae-context.js";
 import { createExecutionReceipt, createRunLogEntry, parseExecutionResult, parseRunLogEntry } from "../shared/run-files.js";
 import { generatePlan } from "../core/generator.js";
+import { resolveMotionRequest } from "../domain/resolve/resolve-motion-request.js";
 import type { EngineHost } from "./contracts.js";
 import { getConfig } from "./config.js";
 
@@ -71,6 +72,7 @@ export function createNodeEngineHost(
       await fs.mkdir(config.contextDir, { recursive: true });
       await fs.mkdir(config.outDir, { recursive: true });
       await fs.mkdir(config.logsDir, { recursive: true });
+      await fs.mkdir(config.stateDir, { recursive: true });
     },
     async loadContext() {
       try {
@@ -81,11 +83,23 @@ export function createNodeEngineHost(
       }
     },
     async generatePlan(params) {
-      return generatePlan({
+      return resolveMotionRequest({
         prompt: params.prompt,
         context: params.context,
-        model: params.model,
-        apiKey: openAiApiKey,
+        store: params.store,
+        requestModelPlan: openAiApiKey
+          ? () =>
+              generatePlan({
+                prompt: params.prompt,
+                context: params.context,
+                model: params.model,
+                apiKey: openAiApiKey,
+              }).then((plan) => ({
+                explanation: plan.explanation,
+                actionPlan: plan.actionPlan,
+                source: plan.source,
+              }))
+          : undefined,
       });
     },
     async createRunLog(params) {

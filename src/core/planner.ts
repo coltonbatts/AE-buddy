@@ -7,8 +7,17 @@ export function buildGeneratedPlan(params: {
   prompt: string;
   context: AEContext;
   planned: PlannedResponse;
+  resolution?: GeneratedPlan["resolution"];
 }): GeneratedPlan {
   const validation = validatePlanAgainstContext(params.planned.actionPlan, params.context);
+  const resolution =
+    params.resolution ??
+    ({
+      kind: "generated",
+      title: params.planned.source === "openai" ? "LLM-assisted plan" : "Rules fallback plan",
+      matchedQuery: params.prompt,
+      confidence: params.planned.source === "openai" ? 0.58 : 0.34,
+    } satisfies GeneratedPlan["resolution"]);
 
   return {
     prompt: params.prompt,
@@ -17,6 +26,7 @@ export function buildGeneratedPlan(params: {
     validation,
     renderedScript: renderActionPlan(params.planned.actionPlan, params.context),
     source: params.planned.source,
+    resolution,
   };
 }
 

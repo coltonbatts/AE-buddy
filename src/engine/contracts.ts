@@ -1,5 +1,6 @@
 import type {
   AEContext,
+  CommandStore,
   ExecutionFeedbackReadResult,
   ExecutionResult,
   GeneratedPlan,
@@ -16,6 +17,7 @@ export interface EngineHost {
     prompt: string;
     context: AEContext;
     model: string;
+    store?: CommandStore | null;
   }): Promise<GeneratedPlan>;
   createRunLog(params: {
     runId: string;

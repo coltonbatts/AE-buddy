@@ -40,6 +40,7 @@ function normalizeLayer(raw: unknown, index: number): LayerContext {
     selectedProperties: Array.isArray(value.selectedProperties)
       ? value.selectedProperties.filter((item): item is string => typeof item === "string")
       : [],
+    selectedKeyframeCount: typeof value.selectedKeyframeCount === "number" ? value.selectedKeyframeCount : 0,
     transform: normalizeTransform(value.transform),
     textValue: typeof value.textValue === "string" ? value.textValue : undefined,
   };
@@ -64,6 +65,7 @@ function normalizeComp(raw: unknown): CompContext | null {
     workAreaStart: typeof value.workAreaStart === "number" ? value.workAreaStart : 0,
     workAreaDuration: typeof value.workAreaDuration === "number" ? value.workAreaDuration : 0,
     displayStartTime: typeof value.displayStartTime === "number" ? value.displayStartTime : 0,
+    currentTime: typeof value.currentTime === "number" ? value.currentTime : 0,
     numLayers: typeof value.numLayers === "number" ? value.numLayers : 0,
     hasCamera: value.hasCamera === true,
     activeCameraName: typeof value.activeCameraName === "string" ? value.activeCameraName : null,

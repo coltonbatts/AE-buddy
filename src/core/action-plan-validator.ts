@@ -51,6 +51,9 @@ function validateActionShape(action: unknown, index: number): string[] {
   switch (type) {
     case "ensure_active_comp":
     case "convert_selected_layers_to_3d":
+    case "center_anchor_point_on_selected_layers":
+    case "trim_selected_layers_to_playhead":
+    case "toggle_motion_blur_on_selected_layers":
       return [];
     case "offset_selected_layers":
       return isNumber(action.frames) ? [] : [`Action ${index + 1} requires a numeric frames value.`];
@@ -70,6 +73,24 @@ function validateActionShape(action: unknown, index: number): string[] {
         : [`Action ${index + 1} palette must be an array of RGB triplets.`];
     case "apply_palette_to_selected_layers":
       return isRgbPalette(action.palette) ? [] : [`Action ${index + 1} requires a non-empty RGB palette.`];
+    case "parent_selected_layers_to_null":
+      return action.nullName === undefined || typeof action.nullName === "string"
+        ? []
+        : [`Action ${index + 1} nullName must be a string when provided.`];
+    case "precompose_selected_layers":
+      return (action.name === undefined || typeof action.name === "string") &&
+        (action.moveAllAttributes === undefined || typeof action.moveAllAttributes === "boolean")
+        ? []
+        : [`Action ${index + 1} precompose configuration is invalid.`];
+    case "easy_ease_selected_keyframes":
+      return action.easeInfluence === undefined || isNumber(action.easeInfluence)
+        ? []
+        : [`Action ${index + 1} easeInfluence must be numeric when provided.`];
+    case "create_text_layer":
+      return (action.text === undefined || typeof action.text === "string") &&
+        (action.name === undefined || typeof action.name === "string")
+        ? []
+        : [`Action ${index + 1} create_text_layer fields must be strings when provided.`];
     default:
       return [`Action ${index + 1} uses an unsupported type.`];
   }
@@ -163,6 +184,10 @@ function hasExpressionTarget(context: AEContext, propertyName?: string) {
   );
 }
 
+function hasLockedSelectedLayers(context: AEContext) {
+  return context.selectedLayers.some((layer) => layer.locked);
+}
+
 export function validatePlanAgainstContext(plan: ActionPlan, context: AEContext): PlanValidationResult {
   const issues: ValidationIssue[] = [];
   const affectedTargets = new Set<string>();
@@ -184,11 +209,45 @@ export function validatePlanAgainstContext(plan: ActionPlan, context: AEContext)
       case "offset_selected_layers":
       case "convert_selected_layers_to_3d":
       case "animate_overshoot_scale_on_selected_layers":
+      case "parent_selected_layers_to_null":
+      case "trim_selected_layers_to_playhead":
+      case "toggle_motion_blur_on_selected_layers":
         if (!context.activeComp) {
           issues.push(actionError("An active composition is required.", action.type));
         }
         if (!context.selectedLayers.length) {
           issues.push(actionError("Select one or more layers before execution.", action.type));
+        }
+        if (hasLockedSelectedLayers(context)) {
+          issues.push(actionError("Unlock the selected layers before execution.", action.type));
+        }
+        selectedLayerNames(context).forEach((name) => affectedTargets.add(`layer:${name}`));
+        break;
+      case "center_anchor_point_on_selected_layers":
+        if (!context.activeComp) {
+          issues.push(actionError("An active composition is required.", action.type));
+        }
+        if (!context.selectedLayers.length) {
+          issues.push(actionError("Select one or more layers before execution.", action.type));
+        }
+        if (hasLockedSelectedLayers(context)) {
+          issues.push(actionError("Unlock the selected layers before execution.", action.type));
+        }
+        if (
+          context.selectedLayers.length > 0 &&
+          context.selectedLayers.every(
+            (layer) => layer.type === "camera" || layer.type === "light" || layer.type === "null",
+          )
+        ) {
+          issues.push(actionError("The selected layers do not support deterministic anchor centering.", action.type));
+        }
+        if (context.selectedLayers.some((layer) => layer.parentName || layer.threeD)) {
+          issues.push(
+            actionWarning(
+              "Parented or 3D layers may shift slightly during anchor centering because compensation is applied in layer space.",
+              action.type,
+            ),
+          );
         }
         selectedLayerNames(context).forEach((name) => affectedTargets.add(`layer:${name}`));
         break;
@@ -210,9 +269,25 @@ export function validatePlanAgainstContext(plan: ActionPlan, context: AEContext)
         }
         selectedLayerNames(context).forEach((name) => affectedTargets.add(`layer:${name}`));
         break;
+      case "easy_ease_selected_keyframes":
+        if (!context.activeComp) {
+          issues.push(actionError("An active composition is required.", action.type));
+        }
+        if (!context.selectedLayers.length) {
+          issues.push(actionError("Select one or more layers before execution.", action.type));
+        }
+        if (hasLockedSelectedLayers(context)) {
+          issues.push(actionError("Unlock the selected layers before applying Easy Ease.", action.type));
+        }
+        if (!context.selectedLayers.some((layer) => layer.selectedKeyframeCount > 0)) {
+          issues.push(actionError("Select one or more keyframes before applying Easy Ease.", action.type));
+        }
+        selectedLayerNames(context).forEach((name) => affectedTargets.add(`layer:${name}`));
+        break;
       case "ensure_camera":
       case "animate_camera_push":
       case "create_shape_grid":
+      case "create_text_layer":
         if (!context.activeComp) {
           issues.push(actionError("An active composition is required.", action.type));
         }
@@ -230,6 +305,32 @@ export function validatePlanAgainstContext(plan: ActionPlan, context: AEContext)
             );
           }
         }
+        break;
+      case "precompose_selected_layers":
+        if (!context.activeComp) {
+          issues.push(actionError("An active composition is required.", action.type));
+        }
+        if (!context.selectedLayers.length) {
+          issues.push(actionError("Select one or more layers before precomposing.", action.type));
+        }
+        if (hasLockedSelectedLayers(context)) {
+          issues.push(actionError("Unlock the selected layers before precomposing.", action.type));
+        }
+        if (
+          context.selectedLayers.some(
+            (layer) =>
+              layer.parentName &&
+              !context.selectedLayers.some((candidate) => candidate.name === layer.parentName),
+          )
+        ) {
+          issues.push(
+            actionWarning(
+              "Some selected layers have parents outside the selection, so precomposing may change inherited transforms.",
+              action.type,
+            ),
+          );
+        }
+        selectedLayerNames(context).forEach((name) => affectedTargets.add(`layer:${name}`));
         break;
       case "apply_palette_to_selected_layers":
         if (!context.activeComp) {
@@ -301,5 +402,19 @@ export function formatAction(action: ActionPlanAction) {
       return `create_shape_grid(${action.columns ?? 4}x${action.rows ?? 4})`;
     case "apply_palette_to_selected_layers":
       return `apply_palette_to_selected_layers(colors=${action.palette.length})`;
+    case "center_anchor_point_on_selected_layers":
+      return "center_anchor_point_on_selected_layers";
+    case "parent_selected_layers_to_null":
+      return `parent_selected_layers_to_null(${action.nullName ?? "AE Buddy Null"})`;
+    case "trim_selected_layers_to_playhead":
+      return "trim_selected_layers_to_playhead";
+    case "precompose_selected_layers":
+      return `precompose_selected_layers(${action.name ?? "AE Buddy Precomp"})`;
+    case "easy_ease_selected_keyframes":
+      return `easy_ease_selected_keyframes(${action.easeInfluence ?? 70})`;
+    case "toggle_motion_blur_on_selected_layers":
+      return "toggle_motion_blur_on_selected_layers";
+    case "create_text_layer":
+      return `create_text_layer(${action.text ?? "New Text"})`;
   }
 }

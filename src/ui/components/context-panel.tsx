@@ -78,12 +78,17 @@ export function ContextPanel(props: {
         <div className="grid gap-2">
           <InfoRow label="Composition" value={activeComp?.name ?? "No active comp"} />
           <InfoRow label="Frame rate" value={activeComp ? `${activeComp.frameRate} fps` : "Unavailable"} />
+          <InfoRow label="Playhead" value={activeComp ? `${activeComp.currentTime.toFixed(2)} s` : "Unavailable"} />
           <InfoRow
             label="Resolution"
             value={activeComp ? `${activeComp.width} × ${activeComp.height}` : "Unavailable"}
           />
           <InfoRow label="Camera" value={activeComp?.hasCamera ? activeComp.activeCameraName ?? "Present" : "None"} />
           <InfoRow label="Selected layers" value={`${context?.selectedLayers.length ?? 0}`} />
+          <InfoRow
+            label="Selected keyframes"
+            value={`${context?.selectedLayers.reduce((count, layer) => count + layer.selectedKeyframeCount, 0) ?? 0}`}
+          />
         </div>
 
         <Separator />

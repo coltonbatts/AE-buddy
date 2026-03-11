@@ -17,6 +17,7 @@ export function ScriptPanel(props: {
   onCopyScript: () => void | Promise<void>;
   onOpenLogFile: () => void | Promise<void>;
   onSaveHistory: () => void | Promise<void>;
+  onSaveRecipe: () => void | Promise<void>;
   onOpenImportScript: () => void | Promise<void>;
 }) {
   const plan = props.activeRun?.generatedPlan;
@@ -38,6 +39,11 @@ export function ScriptPanel(props: {
               {plan ? <Badge variant={plan.validation.ok ? "success" : "danger"}>{plan.validation.ok ? "Ready" : "Blocked"}</Badge> : null}
             </div>
             <p className="text-sm text-white/75">{plan?.explanation ?? "Generate a plan to inspect the rendered script and execution guardrails."}</p>
+            {plan ? (
+              <p className="mt-3 text-xs text-white/45">
+                Resolved via {plan.resolution.title} ({plan.resolution.kind})
+              </p>
+            ) : null}
           </div>
 
           <div className="grid gap-2 sm:grid-cols-2">
@@ -68,6 +74,13 @@ export function ScriptPanel(props: {
               <FileClock className="h-4 w-4" />
               Open Log File
             </Button>
+            <Button variant="ghost" size="sm" onClick={props.onSaveRecipe} disabled={!plan}>
+              <Save className="h-4 w-4" />
+              Save Recipe
+            </Button>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-1">
             <Button variant="ghost" size="sm" onClick={props.onSaveHistory}>
               <Save className="h-4 w-4" />
               Save Prompt History
